@@ -34,6 +34,7 @@
         #task-panel { position: absolute; top: 80px; right: 20px; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); padding: 8px 12px; border-radius: 12px; font-size: 12px; pointer-events: none; display: flex; align-items: center; gap: 6px; }
         #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ffcc77; font-size: 24px; letter-spacing: 4px; backdrop-filter: blur(4px); }
         .damage-flash { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(180,0,0,0); pointer-events: none; z-index: 15; transition: background 0.08s; }
+        #orientation-tip { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: #ffcc77; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; font-size: 20px; text-align: center; backdrop-filter: blur(10px); display: none; }
         @media (max-width: 700px) {
             .stats-panel { font-size: 10px; top: 10px; left: 10px; gap: 8px; padding: 6px 12px; }
             .weapon-panel { font-size: 12px; bottom: 20px; left: 10px; gap: 8px; padding: 6px 12px; }
@@ -47,6 +48,11 @@
     </style>
 </head>
 <body>
+<div id="orientation-tip" style="display: none;">
+    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#ffcc77" stroke-width="1.5"><path d="M4 4h16v16H4zM8 2v4M16 2v4M2 8h4M18 8h4M2 16h4M18 16h4M8 22v-4M16 22v-4"/><path d="M12 8v8M8 12h8"/></svg>
+    <p>请将手机旋转至横屏模式</p>
+    <p style="font-size:14px; margin-top:20px;">点击屏幕继续（横屏后）</p>
+</div>
 <div id="loading">
     <div>后室·深渊 联机持枪</div>
     <div id="loading-status">加载超写实引擎...</div>
@@ -95,12 +101,8 @@
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
     (function() {
-        // 横屏检测
-        const orientationTip = document.createElement('div');
-        orientationTip.id = 'orientation-tip';
-        orientationTip.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);color:#ffcc77;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000;font-size:20px;text-align:center;backdrop-filter:blur(10px);display:none;';
-        orientationTip.innerHTML = '<svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#ffcc77" stroke-width="1.5"><path d="M4 4h16v16H4zM8 2v4M16 2v4M2 8h4M18 8h4M2 16h4M18 16h4M8 22v-4M16 22v-4"/><path d="M12 8v8M8 12h8"/></svg><p>请将手机旋转至横屏模式</p><p style="font-size:14px; margin-top:20px;">游戏需要横屏以获得最佳体验</p>';
-        document.body.appendChild(orientationTip);
+        // 横屏检测：仅提示，不阻塞游戏启动（点击屏幕可继续）
+        const orientationTip = document.getElementById('orientation-tip');
         function checkOrientation() {
             if (window.innerHeight > window.innerWidth) {
                 orientationTip.style.display = 'flex';
@@ -111,10 +113,10 @@
             }
         }
         window.addEventListener('resize', checkOrientation);
-        if (!checkOrientation()) {
-            window.addEventListener('orientationchange', () => { if (checkOrientation()) location.reload(); });
-            return;
-        }
+        orientationTip.addEventListener('click', () => {
+            orientationTip.style.display = 'none';
+        });
+        checkOrientation();
         
         // ==================== 配置 ====================
         // ！！！请替换为您的 Supabase 项目 URL 和 anon key ！！！
@@ -747,7 +749,6 @@
         
         function handleInteractions(){
             if(!gameStarted) return;
-            // 补给箱
             for(let i=0;i<supplyRooms.length;i++){
                 let s=supplyRooms[i];
                 if(s.used) continue;
@@ -770,7 +771,6 @@
                     return;
                 }
             }
-            // 尸体纸条
             for(let i=0;i<corpses.length;i++){
                 let c = corpses[i];
                 if(c.collected) continue;
@@ -788,7 +788,6 @@
                     return;
                 }
             }
-            // 录像带
             if(tapeObject && !hasTape && camera.position.distanceTo(tapeObject.position) < 2){
                 interactHint.style.display='block';
                 if(keyState.e || window.triggerInteract){
@@ -806,7 +805,6 @@
                 }
                 return;
             }
-            // 出口门
             if(exitDoor && hasTape && camera.position.distanceTo(exitDoor.pos) < 3){
                 if(cluesCollected < 5){
                     interactHint.style.display='block';
@@ -823,19 +821,22 @@
             interactHint.style.display='none';
         }
         
-        function hasLineOfSight(from, to){
-            let dir = new THREE.Vector3().subVectors(to, from).normalize();
-            let dist = from.distanceTo(to);
-            raycaster.set(from, dir);
+        function hasLineOfSight(fromPos, toPos, ignoreObj = null) {
+            let dir = new THREE.Vector3().subVectors(toPos, fromPos).normalize();
+            let dist = fromPos.distanceTo(toPos);
+            raycaster.set(fromPos, dir);
             let intersects = raycaster.intersectObjects(scene.children, true);
-            for(let i of intersects){
-                if(i.distance < dist && i.object !== from && i.object !== to && i.object.geometry && i.object.geometry.boundingSphere && i.object.geometry.boundingSphere.radius > 0.2){
-                    return false;
+            for (let i of intersects) {
+                if (i.distance < dist && i.object !== ignoreObj && i.object !== camera) {
+                    if (i.object.geometry && i.object.geometry.boundingSphere && i.object.geometry.boundingSphere.radius > 0.2) {
+                        return false;
+                    }
                 }
             }
             return true;
         }
-        function getClosestSound(pos, maxRadius){
+        
+        function getClosestSound(pos, maxRadius) {
             let best=null, bestDist=Infinity;
             for(let ev of soundEvents){
                 let d=pos.distanceTo(ev.pos);
@@ -844,7 +845,7 @@
             return best;
         }
         
-        // 实体类（五种，为保证性能仅笑魇完整，其余占位）
+        // 实体类（笑魇完整，其他实体简化但保留基本移动）
         class Smiler {
             constructor(pos){
                 this.type='smiler';
@@ -891,7 +892,7 @@
                 let canSee=false;
                 let toPlayer=new THREE.Vector3().subVectors(playerPos,this.mesh.position);
                 let forward=new THREE.Vector3(0,0,1).applyQuaternion(this.mesh.quaternion);
-                if(dist<25 && toPlayer.angleTo(forward)<Math.PI/1.8 && hasLineOfSight(this.mesh.position,playerPos)) canSee=true;
+                if(dist<25 && toPlayer.angleTo(forward)<Math.PI/1.8 && hasLineOfSight(this.mesh.position, playerPos, this.mesh)) canSee=true;
                 let sound=getClosestSound(this.mesh.position,35);
                 if(canSee) this.detection+=delta*2;
                 else this.detection=Math.max(0,this.detection-delta*0.5);
@@ -922,13 +923,219 @@
             }
         }
         
-        class Mimic { constructor(pos){ this.mesh=new THREE.Group(); this.id=Math.random(); this.speed=8.0; this.update=()=>{} } }
-        class Doll { constructor(pos){ this.mesh=new THREE.Group(); this.id=Math.random(); this.speed=7.0; this.update=()=>{} } }
-        class Partygoer { constructor(pos){ this.mesh=new THREE.Group(); this.id=Math.random(); this.speed=6.5; this.update=()=>{} } }
-        class Shadow { constructor(pos){ this.mesh=new THREE.Group(); this.id=Math.random(); this.speed=10.0; this.update=()=>{} } }
+        class Mimic {
+            constructor(pos){
+                this.type='mimic';
+                this.mesh=this.createModel();
+                this.mesh.position.copy(pos);
+                scene.add(this.mesh);
+                this.health=200; this.speed=8.0; this.damage=24;
+                this.state='idle'; this.animTime=Math.random()*Math.PI*2;
+                this.attackCd=0; this.dashCd=0;
+                this.id=Math.random();
+                this.suppressed=false; this.suppressTimer=0;
+            }
+            createModel(){
+                const g=new THREE.Group();
+                const body=new THREE.Mesh(new THREE.CylinderGeometry(0.48,0.43,1.6,24),new THREE.MeshStandardMaterial({color:0xccaa88, roughness:0.4}));
+                body.position.y=0.8; g.add(body);
+                const head=new THREE.Mesh(new THREE.SphereGeometry(0.45,48,48),new THREE.MeshStandardMaterial({color:0xeeddcc, roughness:0.3}));
+                head.position.y=1.6; g.add(head);
+                const armMat=new THREE.MeshStandardMaterial({color:0xccaa88});
+                const la=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.11,1.0,12),armMat);
+                la.position.set(-0.55,1.3,0); la.rotation.z=-0.6; g.add(la);
+                const ra=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.11,1.0,12),armMat);
+                ra.position.set(0.55,1.3,0); ra.rotation.z=0.6; g.add(ra);
+                const ll=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.11,1.1,12),armMat);
+                ll.position.set(-0.35,0.4,0.2); ll.rotation.x=0.3; g.add(ll);
+                const rl=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.11,1.1,12),armMat);
+                rl.position.set(0.35,0.4,-0.15); rl.rotation.x=-0.3; g.add(rl);
+                return g;
+            }
+            update(delta, playerPos){
+                if(this.suppressed){
+                    this.suppressTimer -= delta;
+                    if(this.suppressTimer<=0){ this.suppressed=false; this.speed=8.0; }
+                }
+                this.animTime+=delta*4; this.attackCd-=delta; this.dashCd-=delta;
+                let dist=this.mesh.position.distanceTo(playerPos);
+                let canSee=false;
+                let toPlayer=new THREE.Vector3().subVectors(playerPos,this.mesh.position);
+                let forward=new THREE.Vector3(0,0,1).applyQuaternion(this.mesh.quaternion);
+                if(dist<25 && toPlayer.angleTo(forward)<Math.PI/1.8 && hasLineOfSight(this.mesh.position, playerPos, this.mesh)) canSee=true;
+                let sound=getClosestSound(this.mesh.position,25);
+                if(canSee || sound) this.state='chase';
+                if(this.state==='chase'){
+                    let dir=new THREE.Vector3().subVectors(playerPos,this.mesh.position).normalize();
+                    if(this.dashCd<=0 && dist<12){ this.dashTimer=0.4; this.dashCd=3.0; }
+                    let sp=this.speed;
+                    if(this.dashTimer>0){ sp*=2.5; this.dashTimer-=delta; }
+                    this.mesh.position.x+=dir.x*sp*delta;
+                    this.mesh.position.z+=dir.z*sp*delta;
+                    this.mesh.lookAt(playerPos);
+                    if(dist<1.6 && this.attackCd<=0){ takeDamage(this.damage); this.attackCd=1.2; }
+                }
+                this.mesh.children.forEach(c=>{ if(c.geometry?.type==='CylinderGeometry') c.rotation.z+=(Math.random()-0.5)*0.05; });
+                this.mesh.position.y=0.7+Math.sin(this.animTime*5)*0.04;
+            }
+        }
+        
+        class Doll {
+            constructor(pos){
+                this.type='doll';
+                this.mesh=this.createModel();
+                this.mesh.position.copy(pos);
+                scene.add(this.mesh);
+                this.health=200; this.speed=7.0; this.damage=26;
+                this.state='idle'; this.animTime=Math.random()*Math.PI*2;
+                this.attackCd=0; this.watchTimer=0;
+                this.id=Math.random();
+                this.suppressed=false; this.suppressTimer=0;
+            }
+            createModel(){
+                const g=new THREE.Group();
+                const body=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.9,0.35),new THREE.MeshStandardMaterial({color:0x8b5a2b, roughness:0.6}));
+                body.position.y=0.45; g.add(body);
+                const head=new THREE.Mesh(new THREE.SphereGeometry(0.38,48,48),new THREE.MeshStandardMaterial({color:0xffddbb, roughness:0.4}));
+                head.position.y=0.95; g.add(head);
+                const eyeL=new THREE.Mesh(new THREE.SphereGeometry(0.12,24,24),new THREE.MeshStandardMaterial({color:0xff0000, emissive:0xaa0000}));
+                eyeL.position.set(-0.16,1.05,0.38); g.add(eyeL);
+                const eyeR=eyeL.clone(); eyeR.position.set(0.16,1.05,0.38); g.add(eyeR);
+                const hair=new THREE.Mesh(new THREE.ConeGeometry(0.42,0.28,8),new THREE.MeshStandardMaterial({color:0x4a2a1a}));
+                hair.position.y=1.12; g.add(hair);
+                const skirt=new THREE.Mesh(new THREE.CylinderGeometry(0.65,0.75,0.45,8),new THREE.MeshStandardMaterial({color:0xaa4455}));
+                skirt.position.y=0.25; g.add(skirt);
+                return g;
+            }
+            update(delta, playerPos){
+                if(this.suppressed){
+                    this.suppressTimer -= delta;
+                    if(this.suppressTimer<=0){ this.suppressed=false; this.speed=7.0; }
+                }
+                this.animTime+=delta*4; this.attackCd-=delta;
+                let dist=this.mesh.position.distanceTo(playerPos);
+                let canSee=false;
+                let toPlayer=new THREE.Vector3().subVectors(playerPos,this.mesh.position);
+                let forward=new THREE.Vector3(0,0,1).applyQuaternion(this.mesh.quaternion);
+                if(dist<15 && toPlayer.angleTo(forward)<Math.PI/1.5 && hasLineOfSight(this.mesh.position, playerPos, this.mesh)) canSee=true;
+                let sound=getClosestSound(this.mesh.position,20);
+                if(canSee || sound) this.state='chase';
+                if(this.state==='chase'){
+                    let dir=new THREE.Vector3().subVectors(playerPos,this.mesh.position).normalize();
+                    this.mesh.position.x+=dir.x*this.speed*delta;
+                    this.mesh.position.z+=dir.z*this.speed*delta;
+                    this.mesh.lookAt(playerPos);
+                    if(dist<1.5 && this.attackCd<=0){ takeDamage(this.damage); this.attackCd=1.2; }
+                }
+                this.mesh.position.y=0.45+Math.sin(this.animTime*12)*0.02;
+            }
+        }
+        
+        class Partygoer {
+            constructor(pos){
+                this.type='partygoer';
+                this.mesh=this.createModel();
+                this.mesh.position.copy(pos);
+                scene.add(this.mesh);
+                this.health=999; this.speed=6.5; this.damage=35;
+                this.animTime=Math.random()*Math.PI*2; this.attackCd=0;
+                this.id=Math.random();
+            }
+            createModel(){
+                const g=new THREE.Group();
+                const body=new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.45,1.5,12),new THREE.MeshStandardMaterial({color:0xffaa44, emissive:0x442200}));
+                body.position.y=0.75; g.add(body);
+                const head=new THREE.Mesh(new THREE.SphereGeometry(0.5,48,48),new THREE.MeshStandardMaterial({color:0xffcc88}));
+                head.position.y=1.5; g.add(head);
+                const mask=new THREE.Mesh(new THREE.SphereGeometry(0.52,32,32),new THREE.MeshStandardMaterial({color:0xffffff, emissive:0x442200}));
+                mask.position.z=0.05; head.add(mask);
+                const smile=new THREE.Mesh(new THREE.TorusGeometry(0.35,0.06,24,48,Math.PI),new THREE.MeshStandardMaterial({color:0x000000}));
+                smile.rotation.x=0.2; smile.position.set(0,1.45,0.55); g.add(smile);
+                const hat=new THREE.Mesh(new THREE.ConeGeometry(0.45,0.6,8),new THREE.MeshStandardMaterial({color:0xff6600}));
+                hat.position.y=1.85; g.add(hat);
+                return g;
+            }
+            update(delta, playerPos){
+                this.animTime+=delta*3; this.attackCd-=delta;
+                let dir=new THREE.Vector3().subVectors(playerPos,this.mesh.position).normalize();
+                this.mesh.position.x+=dir.x*this.speed*delta;
+                this.mesh.position.z+=dir.z*this.speed*delta;
+                this.mesh.lookAt(playerPos);
+                let dist=this.mesh.position.distanceTo(playerPos);
+                if(dist<1.5 && this.attackCd<=0){ takeDamage(this.damage); this.attackCd=1.2; }
+                this.mesh.position.y=0.7+Math.sin(this.animTime*8)*0.03;
+            }
+        }
+        
+        class Shadow {
+            constructor(pos){
+                this.type='shadow';
+                this.mesh=this.createModel();
+                this.mesh.position.copy(pos);
+                scene.add(this.mesh);
+                this.health=200; this.speed=10.0; this.damage=40;
+                this.teleportCd=0; this.attackCd=0; this.animTime=Math.random()*Math.PI*2;
+                this.id=Math.random(); this.suppressed=false; this.suppressTimer=0;
+            }
+            createModel(){
+                const g=new THREE.Group();
+                const mat=new THREE.MeshStandardMaterial({color:0x000000, emissive:0x111111, transparent:true, opacity:0.65});
+                const body=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,1.6,16),mat);
+                body.position.y=0.8; g.add(body);
+                const head=new THREE.Mesh(new THREE.SphereGeometry(0.45,32,32),mat);
+                head.position.y=1.6; g.add(head);
+                const eyeL=new THREE.Mesh(new THREE.SphereGeometry(0.14,16,16),new THREE.MeshStandardMaterial({color:0xff0000, emissive:0xff0000}));
+                eyeL.position.set(-0.18,1.68,0.48); g.add(eyeL);
+                const eyeR=eyeL.clone(); eyeR.position.set(0.18,1.68,0.48); g.add(eyeR);
+                return g;
+            }
+            update(delta, playerPos){
+                if(this.suppressed){
+                    this.suppressTimer -= delta;
+                    if(this.suppressTimer<=0){ this.suppressed=false; this.speed=10.0; }
+                }
+                this.animTime+=delta*4; this.attackCd-=delta; this.teleportCd-=delta;
+                let dist=this.mesh.position.distanceTo(playerPos);
+                let canSee=false;
+                let toPlayer=new THREE.Vector3().subVectors(playerPos,this.mesh.position);
+                let forward=new THREE.Vector3(0,0,1).applyQuaternion(this.mesh.quaternion);
+                if(dist<25 && toPlayer.angleTo(forward)<Math.PI/1.8 && hasLineOfSight(this.mesh.position, playerPos, this.mesh)) canSee=true;
+                let sound=getClosestSound(this.mesh.position,30);
+                if(this.teleportCd<=0 && (dist>12 || sound || canSee)){
+                    let target = sound ? sound.pos : playerPos;
+                    this.mesh.position.lerp(target,0.7);
+                    this.teleportCd=2.5;
+                }
+                let dir=new THREE.Vector3().subVectors(playerPos,this.mesh.position).normalize();
+                this.mesh.position.x+=dir.x*this.speed*delta;
+                this.mesh.position.z+=dir.z*this.speed*delta;
+                this.mesh.lookAt(playerPos);
+                if(dist<1.8 && this.attackCd<=0){ takeDamage(this.damage); this.attackCd=1.2; }
+                this.mesh.position.y=0.7+Math.sin(this.animTime*10)*0.05;
+            }
+        }
         
         function spawnEntityNearby(){
-            if(Math.random()<0.01 && smilers.length<3) smilers.push(new Smiler(new THREE.Vector3(camera.position.x+20,0,camera.position.z+20)));
+            let total = smilers.length + mimics.length + dolls.length + partygoers.length + shadows.length;
+            if(total < 6 && Math.random()<0.015){
+                let angle=Math.random()*Math.PI*2;
+                let dist=22+Math.random()*20;
+                let pos=new THREE.Vector3(camera.position.x+Math.cos(angle)*dist,0,camera.position.z+Math.sin(angle)*dist);
+                let inDark = darkZones.some(dz => pos.distanceTo(dz.center) < dz.radius);
+                let r = Math.random();
+                if(inDark){
+                    if(r<0.5) smilers.push(new Smiler(pos));
+                    else if(r<0.7) mimics.push(new Mimic(pos));
+                    else if(r<0.85) dolls.push(new Doll(pos));
+                    else shadows.push(new Shadow(pos));
+                } else {
+                    if(r<0.2) smilers.push(new Smiler(pos));
+                    else if(r<0.4) mimics.push(new Mimic(pos));
+                    else if(r<0.6) dolls.push(new Doll(pos));
+                    else if(r<0.8) partygoers.push(new Partygoer(pos));
+                    else shadows.push(new Shadow(pos));
+                }
+            }
         }
         
         function updateMovement(delta){
@@ -1213,6 +1420,10 @@
                     updateChunks();
                     updateFootstepSound(delta);
                     for(let s of smilers) s.update(delta, camera.position);
+                    for(let m of mimics) m.update(delta, camera.position);
+                    for(let d of dolls) d.update(delta, camera.position);
+                    for(let p of partygoers) p.update(delta, camera.position);
+                    for(let sh of shadows) sh.update(delta, camera.position);
                     spawnEntityNearby();
                     handleInteractions();
                     updateStats(delta);
