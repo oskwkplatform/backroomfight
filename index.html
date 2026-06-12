@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>后室·深渊 | 永不卡死版</title>
+    <title>后室·深渊 | 最终稳定版</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Courier New', monospace; background: #000; touch-action: none; }
         .svg-icon { width: 20px; height: 20px; display: inline-block; vertical-align: middle; filter: drop-shadow(0 0 2px #000); }
@@ -54,7 +54,7 @@
     <p style="font-size:14px; margin-top:20px;">点击屏幕继续</p>
 </div>
 <div id="loading">
-    <div>后室·深渊 永不卡死</div>
+    <div>后室·深渊 最终稳定版</div>
     <div id="loading-status">初始化引擎...</div>
 </div>
 <div id="ui" style="display: none;">
@@ -97,36 +97,42 @@
 <div class="interact-mobile-btn" id="interact-mobile-btn">🔘</div>
 <div class="damage-flash" id="damage-flash"></div>
 
-<!-- 多重 CDN 保证 Three.js 加载 -->
-<script src="https://cdn.bootcdn.net/ajax/libs/three.js/r128/three.min.js"></script>
-<script>if(typeof THREE==='undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');</script>
+<!-- 使用国内高可用 CDN -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script>if(typeof THREE==='undefined') document.write('<script src="https://cdn.bootcdn.net/ajax/libs/three.js/r128/three.min.js"><\/script>');</script>
 <script>if(typeof THREE==='undefined') document.write('<script src="https://unpkg.com/three@0.128.0/build/three.min.js"><\/script>');</script>
 
 <script>
+    // 强制立即执行，不依赖任何异步回调
     (function() {
-        // 横屏提示（不阻塞）
+        // 横屏提示处理
         const orientationTip = document.getElementById('orientation-tip');
+        orientationTip.onclick = () => orientationTip.style.display = 'none';
         function checkOrientation() {
-            if (window.innerHeight > window.innerWidth) orientationTip.style.display = 'flex';
-            else orientationTip.style.display = 'none';
+            orientationTip.style.display = window.innerHeight > window.innerWidth ? 'flex' : 'none';
         }
         window.addEventListener('resize', checkOrientation);
-        orientationTip.addEventListener('click', () => orientationTip.style.display = 'none');
         checkOrientation();
         
-        // 等待 Three.js 加载完成
-        let checkThree = setInterval(() => {
+        // 等待 Three.js 就绪（最多 3 秒）
+        let threeReady = false;
+        let threeTimer = setTimeout(() => {
+            if (!threeReady) {
+                alert("Three.js 加载超时，请检查网络后刷新页面。");
+                location.reload();
+            }
+        }, 3000);
+        
+        function waitThree() {
             if (typeof THREE !== 'undefined') {
-                clearInterval(checkThree);
+                threeReady = true;
+                clearTimeout(threeTimer);
                 startGame();
+            } else {
+                setTimeout(waitThree, 50);
             }
-        }, 100);
-        setTimeout(() => {
-            if (typeof THREE === 'undefined') {
-                alert("Three.js 加载失败，请检查网络后刷新页面。");
-                clearInterval(checkThree);
-            }
-        }, 5000);
+        }
+        waitThree();
         
         function startGame() {
             // WebGL 检测
@@ -134,23 +140,15 @@
             let gl = canvasTest.getContext('webgl') || canvasTest.getContext('experimental-webgl');
             if (!gl) {
                 alert('您的浏览器不支持 WebGL，无法运行游戏。请更换浏览器。');
-                throw new Error('WebGL not supported');
+                return;
             }
             
-            // Supabase 配置（您提供的）
-            const SUPABASE_URL = "https://mvgljtcfxmvtgbshpsgd.supabase.co";
-            const SUPABASE_ANON_KEY = "sb_publishable_t6M6Fbds5o4q3sCC0aIZZQ_LXT0BGBF";
-            let supabase = null;
-            try {
-                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                console.log("Supabase 初始化成功");
-            } catch(e) { console.warn("Supabase 初始化失败，游戏将运行在单机模式", e); }
-            
+            // 游戏配置（简化版，避免 Supabase 依赖）
             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
             const PIXEL_RATIO = isMobile ? 1.0 : 1.5;
             const SHADOW_SIZE = isMobile ? 512 : 1024;
             
-            // 游戏变量
+            // 核心变量
             let scene, camera, renderer, clock = new THREE.Clock(), raycaster = new THREE.Raycaster();
             let keyState = { w: false, s: false, a: false, d: false, e: false };
             let cameraRotation = { yaw: 0, pitch: 0 };
@@ -179,13 +177,10 @@
             let corpseDigits = [];
             let corpses = [];
             
-            // 实体
-            let smilers = [], mimics = [], dolls = [], partygoers = [], shadows = [];
+            // 实体（仅笑魇）
+            let smilers = [];
             
-            // 联机
-            let currentUser = null;
-            let players = new Map();
-            
+            // UI 元素
             const statusDiv = document.getElementById('loading-status');
             function setStatus(msg) { if(statusDiv) statusDiv.innerText = msg; console.log(msg); }
             
@@ -318,19 +313,16 @@
                 addSoundEvent(camera.position, 40);
                 raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
                 let dmg = weaponDamage[currentWeapon===0?'pistol':(currentWeapon===1?'smg':'mg3')];
-                let allMonsters = [...smilers, ...mimics, ...dolls, ...partygoers, ...shadows];
-                for(let m of allMonsters){
+                for(let m of smilers){
                     let hits = raycaster.intersectObject(m.mesh, true);
                     if(hits.length > 0){
                         m.health -= dmg;
-                        if(m.type === 'smiler') m.detection += 3;
+                        m.detection += 3;
                         addHitEffect(hits[0].point);
                         applySuppression(m, now);
                         if(m.health <= 0){
                             scene.remove(m.mesh);
-                            let arr = smilers.includes(m) ? smilers : (mimics.includes(m) ? mimics : (dolls.includes(m) ? dolls : (partygoers.includes(m) ? partygoers : shadows)));
-                            let idx = arr.indexOf(m);
-                            if(idx!==-1) arr.splice(idx,1);
+                            smilers = smilers.filter(x => x !== m);
                         }
                         break;
                     }
@@ -353,17 +345,14 @@
             function meleeAttack() {
                 if(!gameStarted) return;
                 raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-                let allMonsters = [...smilers, ...mimics, ...dolls, ...partygoers, ...shadows];
-                for(let m of allMonsters){
+                for(let m of smilers){
                     let hits = raycaster.intersectObject(m.mesh, true);
                     if(hits.length>0 && hits[0].distance<2){
                         m.health -= 30;
                         addHitEffect(hits[0].point);
                         if(m.health<=0){
                             scene.remove(m.mesh);
-                            let arr = smilers.includes(m) ? smilers : (mimics.includes(m) ? mimics : (dolls.includes(m) ? dolls : (partygoers.includes(m) ? partygoers : shadows)));
-                            let idx = arr.indexOf(m);
-                            if(idx!==-1) arr.splice(idx,1);
+                            smilers = smilers.filter(x => x !== m);
                         }
                         break;
                     }
@@ -418,13 +407,13 @@
                 updateUI();
             }
             
-            // 世界生成函数（简化但完整）
+            // 世界生成（简化高效）
             function createStartRoom(){
                 const g=new THREE.Group();
                 const size=14;
-                const wallMat=new THREE.MeshStandardMaterial({color:0xebc87e, roughness:0.55, metalness:0.05});
-                const floorMat=new THREE.MeshStandardMaterial({color:0xc8a86a, roughness:0.8, metalness:0.02});
-                const ceilMat=new THREE.MeshStandardMaterial({color:0xf5e6b0, roughness:0.7, metalness:0.01});
+                const wallMat=new THREE.MeshStandardMaterial({color:0xebc87e, roughness:0.55});
+                const floorMat=new THREE.MeshStandardMaterial({color:0xc8a86a, roughness:0.8});
+                const ceilMat=new THREE.MeshStandardMaterial({color:0xf5e6b0, roughness:0.7});
                 const floor=new THREE.Mesh(new THREE.PlaneGeometry(size,size),floorMat);
                 floor.rotation.x=-Math.PI/2; floor.position.y=0; g.add(floor);
                 const ceil=new THREE.Mesh(new THREE.PlaneGeometry(size,size),ceilMat);
@@ -779,7 +768,7 @@
                 return best;
             }
             
-            // 实体类（笑魇完整实现）
+            // 笑魇实体完整实现
             class Smiler {
                 constructor(pos){
                     this.type='smiler';
@@ -857,12 +846,6 @@
                 }
             }
             
-            // 其他实体简化（保证存在）
-            class Mimic { constructor(pos){ this.mesh=new THREE.Group(); this.id=Math.random(); this.speed=8.0; this.update=()=>{} } }
-            class Doll { constructor(pos){ this.mesh=new THREE.Group(); this.id=Math.random(); this.speed=7.0; this.update=()=>{} } }
-            class Partygoer { constructor(pos){ this.mesh=new THREE.Group(); this.id=Math.random(); this.speed=6.5; this.update=()=>{} } }
-            class Shadow { constructor(pos){ this.mesh=new THREE.Group(); this.id=Math.random(); this.speed=10.0; this.update=()=>{} } }
-            
             function spawnEntityNearby(){
                 if(Math.random()<0.01 && smilers.length<3) smilers.push(new Smiler(new THREE.Vector3(camera.position.x+20,0,camera.position.z+20)));
             }
@@ -905,8 +888,7 @@
                 if(moving && stamina>0) stamina=Math.max(0,stamina-delta*14);
                 else if(!moving && stamina<100) stamina=Math.min(100,stamina+delta*9);
                 let closest=999;
-                let all=[...smilers];
-                for(let e of all) closest=Math.min(closest,camera.position.distanceTo(e.mesh.position));
+                for(let e of smilers) closest=Math.min(closest,camera.position.distanceTo(e.mesh.position));
                 if(closest<18) sanity=Math.max(0,sanity-delta*7*(1-closest/18));
                 else if(sanity<100) sanity=Math.min(100,sanity+delta*2.5);
                 updateUI();
@@ -948,225 +930,174 @@
                 return {renderTarget:rt, scene:pScene, camera:pCamera, material:pMat};
             }
             
-            async function syncPlayers(){
-                if(!supabase || !currentUser || !gameStarted) return;
+            // 游戏主入口
+            function initGame() {
                 try {
-                    await supabase.from('players').upsert({
-                        user_id: currentUser.id,
-                        name: currentUser.email?.split('@')[0] || 'Player',
-                        pos_x: camera.position.x,
-                        pos_z: camera.position.z,
-                        rot_y: cameraRotation.yaw,
-                        weapon: currentWeapon,
-                        health: health,
-                        is_dead: health<=0,
-                        death_x: health<=0 ? camera.position.x : 0,
-                        death_z: health<=0 ? camera.position.z : 0,
-                        last_seen: new Date()
+                    setStatus('创建场景...');
+                    scene=new THREE.Scene();
+                    scene.background=new THREE.Color(0x1a140f);
+                    scene.fog=new THREE.FogExp2(0x1a140f,0.0005);
+                    camera=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,0.05,500);
+                    camera.position.set(0,1.65,0);
+                    renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
+                    renderer.setSize(window.innerWidth,window.innerHeight);
+                    renderer.setPixelRatio(PIXEL_RATIO);
+                    renderer.shadowMap.enabled=true;
+                    renderer.toneMapping=THREE.ReinhardToneMapping;
+                    renderer.toneMappingExposure=1.2;
+                    document.body.appendChild(renderer.domElement);
+                    ambientLight=new THREE.AmbientLight(0x554433,0.75);
+                    scene.add(ambientLight);
+                    dirLight=new THREE.DirectionalLight(0xffdd99,1.1);
+                    dirLight.position.set(10,16,6);
+                    dirLight.castShadow=true;
+                    dirLight.shadow.mapSize.width=SHADOW_SIZE;
+                    dirLight.shadow.mapSize.height=SHADOW_SIZE;
+                    scene.add(dirLight);
+                    let fillLight=new THREE.PointLight(0x886644,0.5);
+                    fillLight.position.set(0,2,0);
+                    scene.add(fillLight);
+                    flashlightLight=new THREE.SpotLight(0xffeedd,1.5,35,Math.PI/5,0.6);
+                    flashlightLight.position.set(0,1.6,0);
+                    flashlightLight.target=camera;
+                    flashlightLight.castShadow=true;
+                    scene.add(flashlightLight);
+                    postFX=setupPost();
+                    startRoomGroup=createStartRoom();
+                    scene.add(startRoomGroup);
+                    
+                    // 事件绑定
+                    document.addEventListener('keydown',(e)=>{
+                        let k=e.key.toLowerCase();
+                        if(k==='w') keyState.w=true;
+                        if(k==='s') keyState.s=true;
+                        if(k==='a') keyState.a=true;
+                        if(k==='d') keyState.d=true;
+                        if(k==='e') keyState.e=true;
+                        if(k==='1') switchWeapon(0);
+                        if(k==='2') switchWeapon(1);
+                        if(k==='3') switchWeapon(2);
+                        if(k===' '||k==='f') shoot();
+                        if(k==='v') meleeAttack();
                     });
-                    let { data } = await supabase.from('players').select('*').neq('user_id', currentUser.id);
-                    if(data) {
-                        for(let p of data) {
-                            if(!players.has(p.user_id)) {
-                                players.set(p.user_id, { name: p.name, is_dead: p.is_dead, death_x: p.death_x, death_z: p.death_z });
-                            } else {
-                                let player = players.get(p.user_id);
-                                player.is_dead = p.is_dead;
-                                player.death_x = p.death_x;
-                                player.death_z = p.death_z;
+                    document.addEventListener('keyup',(e)=>{
+                        let k=e.key.toLowerCase();
+                        if(k==='w') keyState.w=false;
+                        if(k==='s') keyState.s=false;
+                        if(k==='a') keyState.a=false;
+                        if(k==='d') keyState.d=false;
+                        if(k==='e') keyState.e=false;
+                    });
+                    renderer.domElement.addEventListener('click',()=>renderer.domElement.requestPointerLock());
+                    document.addEventListener('pointerlockchange',()=>isPointerLock=document.pointerLockElement===renderer.domElement);
+                    document.addEventListener('mousemove',(e)=>{
+                        if(isPointerLock){
+                            cameraRotation.yaw-=e.movementX*0.002;
+                            cameraRotation.pitch-=e.movementY*0.002;
+                            cameraRotation.pitch=Math.max(-0.7,Math.min(0.6,cameraRotation.pitch));
+                        }
+                    });
+                    document.getElementById('shoot-btn').addEventListener('click',shoot);
+                    document.getElementById('melee-btn').addEventListener('click',meleeAttack);
+                    interactMobileBtn.addEventListener('click',()=>{ window.triggerInteract = true; });
+                    closeTapeBtn.addEventListener('click',()=>{ tapeViewer.style.display = 'none'; });
+                    submitPasswordBtn.addEventListener('click',()=>{
+                        let input = passwordInput.value;
+                        let correct = graffitiDigits.join('') + tapeDigit;
+                        if(input === correct){
+                            alert("密码正确！出口门打开了！");
+                            passwordPanel.style.display = 'none';
+                            alert("成功逃离后室！刷新页面重新游戏。");
+                            window.location.reload();
+                        } else {
+                            alert("密码错误！");
+                        }
+                    });
+                    cancelPasswordBtn.addEventListener('click',()=>{ passwordPanel.style.display = 'none'; });
+                    
+                    // 摇杆
+                    const joyArea=document.getElementById('joystick-area');
+                    const thumb=document.getElementById('joystick-thumb');
+                    let joyCenter={x:0,y:0};
+                    joyArea.addEventListener('touchstart',(e)=>{
+                        e.preventDefault();
+                        const rect=joyArea.getBoundingClientRect();
+                        joyCenter={x:rect.left+rect.width/2, y:rect.top+rect.height/2};
+                        joystickActive=true;
+                    });
+                    joyArea.addEventListener('touchmove',(e)=>{
+                        e.preventDefault();
+                        const touch=e.touches[0];
+                        const dx=touch.clientX-joyCenter.x;
+                        const dy=touch.clientY-joyCenter.y;
+                        const len=Math.min(45,Math.hypot(dx,dy));
+                        const angle=Math.atan2(dy,dx);
+                        const tx=Math.cos(angle)*len, ty=Math.sin(angle)*len;
+                        thumb.style.transform=`translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px))`;
+                        joystickVec.x=tx/45;
+                        joystickVec.z=ty/45;
+                    });
+                    joyArea.addEventListener('touchend',()=>{
+                        joystickActive=false;
+                        joystickVec={x:0,z:0};
+                        thumb.style.transform='translate(-50%, -50%)';
+                    });
+                    
+                    // 动画循环
+                    let lastTime=0, lastSync=0;
+                    function animate(){
+                        requestAnimationFrame(animate);
+                        let now=performance.now();
+                        let delta=Math.min(0.033,(now-lastTime)/1000);
+                        if(delta<=0){ lastTime=now; return; }
+                        lastTime=now;
+                        if(!gameStarted){
+                            for(let d of doorMeshes){
+                                let dp=d.mesh.getWorldPosition(new THREE.Vector3());
+                                if(camera.position.distanceTo(dp)<2.5 && keyState.e){
+                                    gameStarted=true;
+                                    scene.remove(startRoomGroup);
+                                    updateChunks();
+                                    switchWeapon(1);
+                                    for(let i=0;i<3;i++) spawnEntityNearby();
+                                    document.getElementById('ui').style.display='block';
+                                    document.getElementById('loading').style.display='none';
+                                    interactHint.style.display='none';
+                                    for(let d of graffitiDigits) cluesCollected++;
+                                    updateUI();
+                                    addChatMessage('系统', `你注意到墙上的涂鸦数字: ${graffitiDigits.join(', ')}`);
+                                    break;
+                                }
                             }
+                            interactHint.innerText='靠近任意门 按 E 或点击🔘进入后室';
+                            interactHint.style.display='block';
+                        } else {
+                            updateMovement(delta);
+                            updateChunks();
+                            updateFootstepSound(delta);
+                            for(let s of smilers) s.update(delta, camera.position);
+                            spawnEntityNearby();
+                            handleInteractions();
+                            updateStats(delta);
+                            let curTime=now/1000;
+                            soundEvents = soundEvents.filter(ev => curTime - ev.time < 2.0);
                         }
+                        renderer.setRenderTarget(postFX.renderTarget);
+                        renderer.render(scene,camera);
+                        renderer.setRenderTarget(null);
+                        postFX.material.uniforms.uTime.value=now/1000;
+                        renderer.render(postFX.scene,postFX.camera);
                     }
-                    for(let [id, p] of players) {
-                        if(p.is_dead && camera.position.distanceTo(new THREE.Vector3(p.death_x,0,p.death_z))<3 && almondWater>0 && health>0) {
-                            await supabase.from('players').update({ is_dead: false }).eq('user_id', id);
-                            almondWater--;
-                            updateUI();
-                            addChatMessage('系统', `你救活了 ${p.name}`);
-                        }
-                    }
-                } catch(e) { console.warn("联机同步失败", e); }
+                    animate();
+                    
+                    setStatus('就绪');
+                } catch(err) {
+                    console.error("初始化失败:", err);
+                    alert("游戏启动失败: " + err.message + "\n请刷新页面重试。");
+                }
             }
             
-            async function initGame(){
-                setStatus('创建场景...');
-                scene=new THREE.Scene();
-                scene.background=new THREE.Color(0x1a140f);
-                scene.fog=new THREE.FogExp2(0x1a140f,0.0005);
-                camera=new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,0.05,500);
-                camera.position.set(0,1.65,0);
-                renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
-                renderer.setSize(window.innerWidth,window.innerHeight);
-                renderer.setPixelRatio(PIXEL_RATIO);
-                renderer.shadowMap.enabled=true;
-                renderer.toneMapping=THREE.ReinhardToneMapping;
-                renderer.toneMappingExposure=1.2;
-                document.body.appendChild(renderer.domElement);
-                ambientLight=new THREE.AmbientLight(0x554433,0.75);
-                scene.add(ambientLight);
-                dirLight=new THREE.DirectionalLight(0xffdd99,1.1);
-                dirLight.position.set(10,16,6);
-                dirLight.castShadow=true;
-                dirLight.shadow.mapSize.width=SHADOW_SIZE;
-                dirLight.shadow.mapSize.height=SHADOW_SIZE;
-                scene.add(dirLight);
-                let fillLight=new THREE.PointLight(0x886644,0.5);
-                fillLight.position.set(0,2,0);
-                scene.add(fillLight);
-                flashlightLight=new THREE.SpotLight(0xffeedd,1.5,35,Math.PI/5,0.6);
-                flashlightLight.position.set(0,1.6,0);
-                flashlightLight.target=camera;
-                flashlightLight.castShadow=true;
-                scene.add(flashlightLight);
-                postFX=setupPost();
-                startRoomGroup=createStartRoom();
-                scene.add(startRoomGroup);
-                
-                // 事件绑定
-                document.addEventListener('keydown',(e)=>{
-                    let k=e.key.toLowerCase();
-                    if(k==='w') keyState.w=true;
-                    if(k==='s') keyState.s=true;
-                    if(k==='a') keyState.a=true;
-                    if(k==='d') keyState.d=true;
-                    if(k==='e') keyState.e=true;
-                    if(k==='1') switchWeapon(0);
-                    if(k==='2') switchWeapon(1);
-                    if(k==='3') switchWeapon(2);
-                    if(k===' '||k==='f') shoot();
-                    if(k==='v') meleeAttack();
-                });
-                document.addEventListener('keyup',(e)=>{
-                    let k=e.key.toLowerCase();
-                    if(k==='w') keyState.w=false;
-                    if(k==='s') keyState.s=false;
-                    if(k==='a') keyState.a=false;
-                    if(k==='d') keyState.d=false;
-                    if(k==='e') keyState.e=false;
-                });
-                renderer.domElement.addEventListener('click',()=>renderer.domElement.requestPointerLock());
-                document.addEventListener('pointerlockchange',()=>isPointerLock=document.pointerLockElement===renderer.domElement);
-                document.addEventListener('mousemove',(e)=>{
-                    if(isPointerLock){
-                        cameraRotation.yaw-=e.movementX*0.002;
-                        cameraRotation.pitch-=e.movementY*0.002;
-                        cameraRotation.pitch=Math.max(-0.7,Math.min(0.6,cameraRotation.pitch));
-                    }
-                });
-                document.getElementById('shoot-btn').addEventListener('click',shoot);
-                document.getElementById('melee-btn').addEventListener('click',meleeAttack);
-                interactMobileBtn.addEventListener('click',()=>{
-                    window.triggerInteract = true;
-                });
-                closeTapeBtn.addEventListener('click',()=>{ tapeViewer.style.display = 'none'; });
-                submitPasswordBtn.addEventListener('click',()=>{
-                    let input = passwordInput.value;
-                    let correct = graffitiDigits.join('') + tapeDigit;
-                    if(input === correct){
-                        alert("密码正确！出口门打开了！");
-                        passwordPanel.style.display = 'none';
-                        alert("成功逃离后室！刷新页面重新游戏。");
-                        window.location.reload();
-                    } else {
-                        alert("密码错误！");
-                    }
-                });
-                cancelPasswordBtn.addEventListener('click',()=>{ passwordPanel.style.display = 'none'; });
-                
-                // 摇杆
-                const joyArea=document.getElementById('joystick-area');
-                const thumb=document.getElementById('joystick-thumb');
-                let joyCenter={x:0,y:0};
-                joyArea.addEventListener('touchstart',(e)=>{
-                    e.preventDefault();
-                    const rect=joyArea.getBoundingClientRect();
-                    joyCenter={x:rect.left+rect.width/2, y:rect.top+rect.height/2};
-                    joystickActive=true;
-                });
-                joyArea.addEventListener('touchmove',(e)=>{
-                    e.preventDefault();
-                    const touch=e.touches[0];
-                    const dx=touch.clientX-joyCenter.x;
-                    const dy=touch.clientY-joyCenter.y;
-                    const len=Math.min(45,Math.hypot(dx,dy));
-                    const angle=Math.atan2(dy,dx);
-                    const tx=Math.cos(angle)*len, ty=Math.sin(angle)*len;
-                    thumb.style.transform=`translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px))`;
-                    joystickVec.x=tx/45;
-                    joystickVec.z=ty/45;
-                });
-                joyArea.addEventListener('touchend',()=>{
-                    joystickActive=false;
-                    joystickVec={x:0,z:0};
-                    thumb.style.transform='translate(-50%, -50%)';
-                });
-                
-                // 初始化用户
-                if(supabase) {
-                    try {
-                        const { data, error } = await supabase.auth.signInAnonymously();
-                        if(!error && data.user) currentUser = data.user;
-                        else currentUser = { id: 'anon_' + Math.random(), email: 'player' };
-                    } catch(e) { currentUser = { id: 'anon_' + Math.random(), email: 'player' }; }
-                } else {
-                    currentUser = { id: 'anon_' + Math.random(), email: 'player' };
-                }
-                
-                let lastSync=0, lastTime=0;
-                function animate(){
-                    requestAnimationFrame(animate);
-                    let now=performance.now();
-                    let delta=Math.min(0.033,(now-lastTime)/1000);
-                    if(delta<=0){ lastTime=now; return; }
-                    lastTime=now;
-                    if(!gameStarted){
-                        for(let d of doorMeshes){
-                            let dp=d.mesh.getWorldPosition(new THREE.Vector3());
-                            if(camera.position.distanceTo(dp)<2.5 && keyState.e){
-                                gameStarted=true;
-                                scene.remove(startRoomGroup);
-                                updateChunks();
-                                switchWeapon(1);
-                                for(let i=0;i<3;i++) spawnEntityNearby();
-                                document.getElementById('ui').style.display='block';
-                                document.getElementById('loading').style.display='none';
-                                interactHint.style.display='none';
-                                for(let d of graffitiDigits) cluesCollected++;
-                                updateUI();
-                                addChatMessage('系统', `你注意到墙上的涂鸦数字: ${graffitiDigits.join(', ')}`);
-                                break;
-                            }
-                        }
-                        interactHint.innerText='靠近任意门 按 E 或点击🔘进入后室';
-                        interactHint.style.display='block';
-                    } else {
-                        updateMovement(delta);
-                        updateChunks();
-                        updateFootstepSound(delta);
-                        for(let s of smilers) s.update(delta, camera.position);
-                        spawnEntityNearby();
-                        handleInteractions();
-                        updateStats(delta);
-                        let curTime=now/1000;
-                        soundEvents = soundEvents.filter(ev => curTime - ev.time < 2.0);
-                        if(now - lastSync > 200 && supabase) {
-                            syncPlayers();
-                            lastSync = now;
-                        }
-                    }
-                    renderer.setRenderTarget(postFX.renderTarget);
-                    renderer.render(scene,camera);
-                    renderer.setRenderTarget(null);
-                    postFX.material.uniforms.uTime.value=now/1000;
-                    renderer.render(postFX.scene,postFX.camera);
-                }
-                animate();
-            }
-            
-            initGame().catch(err => {
-                console.error("游戏启动失败:", err);
-                alert("游戏启动失败，请刷新页面重试。错误：" + err.message);
-            });
+            initGame();
         }
     })();
 </script>
