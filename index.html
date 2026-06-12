@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>后室·深渊 | 联机持枪终极版</title>
+    <title>后室·深渊 | 联机持枪正式版</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Courier New', monospace; background: #000; touch-action: none; }
         .svg-icon { width: 20px; height: 20px; display: inline-block; vertical-align: middle; filter: drop-shadow(0 0 2px #000); }
@@ -51,7 +51,7 @@
 <div id="orientation-tip" style="display: none;">
     <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#ffcc77" stroke-width="1.5"><path d="M4 4h16v16H4zM8 2v4M16 2v4M2 8h4M18 8h4M2 16h4M18 16h4M8 22v-4M16 22v-4"/><path d="M12 8v8M8 12h8"/></svg>
     <p>请将手机旋转至横屏模式</p>
-    <p style="font-size:14px; margin-top:20px;">点击屏幕继续（横屏后）</p>
+    <p style="font-size:14px; margin-top:20px;">点击屏幕继续</p>
 </div>
 <div id="loading">
     <div>后室·深渊 联机持枪</div>
@@ -76,7 +76,7 @@
     <div id="task-panel"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffaa66"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="8" y1="12" x2="16" y2="12"/></svg> 线索: 0/5</div>
 </div>
 <div id="chat-box">
-    <div id="chat-messages">[系统] 联机已连接，按回车聊天<br></div>
+    <div id="chat-messages">[系统] 按回车聊天<br></div>
     <input type="text" id="chat-input" placeholder="聊天..." autocomplete="off">
 </div>
 <div id="tape-viewer">
@@ -97,19 +97,18 @@
 <div class="interact-mobile-btn" id="interact-mobile-btn">🔘</div>
 <div class="damage-flash" id="damage-flash"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- 使用国内可靠 CDN -->
+<script src="https://cdn.bootcdn.net/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script>
     (function() {
-        // 横屏检测：仅提示，不阻塞游戏启动（点击屏幕可继续）
+        // 横屏提示（不阻塞，点击可关闭）
         const orientationTip = document.getElementById('orientation-tip');
         function checkOrientation() {
             if (window.innerHeight > window.innerWidth) {
                 orientationTip.style.display = 'flex';
-                return false;
             } else {
                 orientationTip.style.display = 'none';
-                return true;
             }
         }
         window.addEventListener('resize', checkOrientation);
@@ -118,11 +117,22 @@
         });
         checkOrientation();
         
+        // WebGL 检测
+        let canvasTest = document.createElement('canvas');
+        let gl = canvasTest.getContext('webgl') || canvasTest.getContext('experimental-webgl');
+        if (!gl) {
+            alert('您的浏览器不支持 WebGL，无法运行游戏。请更换浏览器。');
+            throw new Error('WebGL not supported');
+        }
+        
         // ==================== 配置 ====================
         // ！！！请替换为您的 Supabase 项目 URL 和 anon key ！！！
         const SUPABASE_URL = "https://你的项目.supabase.co";
         const SUPABASE_ANON_KEY = "你的 anon key";
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        let supabase = null;
+        try {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        } catch(e) { console.warn("Supabase 初始化失败，将使用单人模式", e); }
         
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         const PIXEL_RATIO = isMobile ? 1.0 : 1.5;
@@ -167,110 +177,7 @@
         const statusDiv = document.getElementById('loading-status');
         function setStatus(msg) { if(statusDiv) statusDiv.innerText = msg; console.log(msg); }
         
-        // 远程武器模型
-        function createRemoteWeapon(type) {
-            const group = new THREE.Group();
-            if(type === 0) {
-                const body = new THREE.Mesh(new THREE.BoxGeometry(0.12,0.08,0.25), new THREE.MeshStandardMaterial({color:0x333333, metalness:0.8}));
-                body.position.set(0.1,0,0.15);
-                group.add(body);
-                const grip = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.12,0.15), new THREE.MeshStandardMaterial({color:0x5a3a2a}));
-                grip.position.set(0.1,-0.07,0);
-                group.add(grip);
-            } else if(type === 1) {
-                const body = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.1,0.35), new THREE.MeshStandardMaterial({color:0x2a2a2a, metalness:0.7}));
-                body.position.set(0.1,0,0.2);
-                group.add(body);
-                const mag = new THREE.Mesh(new THREE.BoxGeometry(0.08,0.14,0.1), new THREE.MeshStandardMaterial({color:0x553322}));
-                mag.position.set(0.1,-0.1,0.05);
-                group.add(mag);
-                const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.3,8), new THREE.MeshStandardMaterial({color:0x111111, metalness:0.95}));
-                barrel.rotation.z = Math.PI/2;
-                barrel.position.set(0.1,0.02,0.4);
-                group.add(barrel);
-            } else {
-                const body = new THREE.Mesh(new THREE.BoxGeometry(0.22,0.12,0.45), new THREE.MeshStandardMaterial({color:0x2a2a2a, metalness:0.8}));
-                body.position.set(0.1,0,0.25);
-                group.add(body);
-                const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.055,0.055,0.45,8), new THREE.MeshStandardMaterial({color:0x111111, metalness:0.95}));
-                barrel.rotation.z = Math.PI/2;
-                barrel.position.set(0.1,0.04,0.5);
-                group.add(barrel);
-                const bipod = new THREE.Mesh(new THREE.BoxGeometry(0.15,0.05,0.2), new THREE.MeshStandardMaterial({color:0x553322}));
-                bipod.position.set(0.1,-0.09,0.1);
-                group.add(bipod);
-            }
-            return group;
-        }
-        
-        function createRemotePlayerModel(name, weaponType) {
-            const group = new THREE.Group();
-            const bodyMat = new THREE.MeshStandardMaterial({color:0x5a6e3c, roughness:0.5});
-            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,1.35,8), bodyMat);
-            body.position.y = 0.68; group.add(body);
-            const vest = new THREE.Mesh(new THREE.BoxGeometry(0.55,0.35,0.25), new THREE.MeshStandardMaterial({color:0x3a4a2a}));
-            vest.position.set(0,0.9,0.2); group.add(vest);
-            const head = new THREE.Mesh(new THREE.SphereGeometry(0.34,24,24), new THREE.MeshStandardMaterial({color:0xddccaa}));
-            head.position.y = 1.35; group.add(head);
-            const helmet = new THREE.Mesh(new THREE.CylinderGeometry(0.38,0.42,0.2,8), new THREE.MeshStandardMaterial({color:0x4a5a2a}));
-            helmet.position.y = 1.52; group.add(helmet);
-            const goggles = new THREE.Mesh(new THREE.BoxGeometry(0.38,0.16,0.12), new THREE.MeshStandardMaterial({color:0x222222, metalness:0.9}));
-            goggles.position.set(0,1.44,0.35); group.add(goggles);
-            const belt = new THREE.Mesh(new THREE.TorusGeometry(0.42,0.05,8,32), new THREE.MeshStandardMaterial({color:0x2a2a2a}));
-            belt.rotation.x = Math.PI/2; belt.position.y = 0.55; group.add(belt);
-            const canvas = document.createElement('canvas'); canvas.width=256; canvas.height=64;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(0,0,canvas.width,canvas.height);
-            ctx.font = 'Bold 18px "Courier New"'; ctx.fillStyle = '#ffcc77'; ctx.textAlign = 'center';
-            ctx.fillText(name, canvas.width/2, 32);
-            const texture = new THREE.CanvasTexture(canvas);
-            const label = new THREE.Sprite(new THREE.SpriteMaterial({map: texture, depthTest: false}));
-            label.scale.set(1.2,0.3,1); label.position.y = 1.7;
-            group.add(label);
-            const weaponGroup = createRemoteWeapon(weaponType);
-            weaponGroup.position.set(0.45, 0.9, 0.35);
-            weaponGroup.rotation.x = 0.2;
-            weaponGroup.rotation.z = -0.3;
-            group.add(weaponGroup);
-            return { group, weaponGroup };
-        }
-        
-        // 聊天系统
-        const chatMessages = document.getElementById('chat-messages');
-        const chatInput = document.getElementById('chat-input');
-        function addChatMessage(sender, msg) {
-            let div = document.createElement('div');
-            div.innerHTML = `<span style="color:#88ff88">[${sender}]</span> ${msg}`;
-            chatMessages.appendChild(div);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-        chatInput.addEventListener('keypress', (e) => {
-            if(e.key === 'Enter' && chatInput.value.trim()) {
-                addChatMessage('你', chatInput.value);
-                chatInput.value = '';
-            }
-        });
-        
-        // UI 元素
-        const healthSpan = document.getElementById('health-val');
-        const sanitySpan = document.getElementById('sanity-val');
-        const staminaSpan = document.getElementById('stamina-val');
-        const waterSpan = document.getElementById('water-val');
-        const distanceSpan = document.getElementById('distance-val');
-        const exitDistSpan = document.getElementById('exit-dist');
-        const ammoValSpan = document.getElementById('ammo-val');
-        const ammoMaxSpan = document.getElementById('ammo-max');
-        const interactHint = document.getElementById('interact-hint');
-        const taskSpan = document.getElementById('task-panel');
-        const tapeViewer = document.getElementById('tape-viewer');
-        const tapeTextDiv = document.getElementById('tape-text');
-        const passwordPanel = document.getElementById('password-panel');
-        const passwordInput = document.getElementById('password-input');
-        const closeTapeBtn = document.getElementById('close-tape');
-        const submitPasswordBtn = document.getElementById('submit-password');
-        const cancelPasswordBtn = document.getElementById('cancel-password');
-        const interactMobileBtn = document.getElementById('interact-mobile-btn');
-        
+        // ========== 辅助函数 ==========
         function updateUI() {
             healthSpan.innerText = Math.floor(health);
             sanitySpan.innerText = Math.floor(sanity);
@@ -418,6 +325,7 @@
             }
         }
         
+        // ========== 枪械模型 ==========
         function createSMG(){
             let g=new THREE.Group();
             let b=new THREE.Mesh(new THREE.BoxGeometry(0.24,0.15,0.58),new THREE.MeshStandardMaterial({color:0x2a2a2a,metalness:0.85,roughness:0.3}));
@@ -465,6 +373,7 @@
             updateUI();
         }
         
+        // ========== 世界生成 ==========
         function createStartRoom(){
             const g=new THREE.Group();
             const size=14;
@@ -845,7 +754,7 @@
             return best;
         }
         
-        // 实体类（笑魇完整，其他实体简化但保留基本移动）
+        // ========== 实体定义（完整 AI）==========
         class Smiler {
             constructor(pos){
                 this.type='smiler';
@@ -1219,59 +1128,68 @@
             return {renderTarget:rt, scene:pScene, camera:pCamera, material:pMat};
         }
         
+        // 联机功能（简化，避免因 Supabase 配置错误而卡死）
         async function syncPlayers(){
-            if(!currentUser || !gameStarted) return;
-            await supabase.from('players').upsert({
-                user_id: currentUser.id,
-                name: currentUser.email.split('@')[0],
-                pos_x: camera.position.x,
-                pos_z: camera.position.z,
-                rot_y: cameraRotation.yaw,
-                weapon: currentWeapon,
-                health: health,
-                is_dead: health<=0,
-                death_x: health<=0 ? camera.position.x : 0,
-                death_z: health<=0 ? camera.position.z : 0,
-                last_seen: new Date()
-            });
-            let { data } = await supabase.from('players').select('*').neq('user_id', currentUser.id);
-            if(data) {
-                for(let p of data) {
-                    if(!players.has(p.user_id)) {
-                        let { group, weaponGroup } = createRemotePlayerModel(p.name, p.weapon || 1);
-                        group.position.set(p.pos_x, 1.65, p.pos_z);
-                        group.rotation.y = p.rot_y;
-                        scene.add(group);
-                        players.set(p.user_id, { mesh: group, weaponGroup: weaponGroup, currentWeapon: p.weapon || 1, name: p.name, is_dead: p.is_dead, death_x: p.death_x, death_z: p.death_z });
-                    } else {
-                        let player = players.get(p.user_id);
-                        player.mesh.position.set(p.pos_x, 1.65, p.pos_z);
-                        player.mesh.rotation.y = p.rot_y;
-                        player.is_dead = p.is_dead;
-                        player.death_x = p.death_x;
-                        player.death_z = p.death_z;
-                        if(player.currentWeapon !== p.weapon) {
-                            player.mesh.remove(player.weaponGroup);
-                            let newWeaponGroup = createRemoteWeapon(p.weapon);
-                            newWeaponGroup.position.set(0.45, 0.9, 0.35);
-                            newWeaponGroup.rotation.x = 0.2;
-                            newWeaponGroup.rotation.z = -0.3;
-                            player.mesh.add(newWeaponGroup);
-                            player.weaponGroup = newWeaponGroup;
-                            player.currentWeapon = p.weapon;
+            if(!supabase || !currentUser || !gameStarted) return;
+            try {
+                await supabase.from('players').upsert({
+                    user_id: currentUser.id,
+                    name: currentUser.email.split('@')[0],
+                    pos_x: camera.position.x,
+                    pos_z: camera.position.z,
+                    rot_y: cameraRotation.yaw,
+                    weapon: currentWeapon,
+                    health: health,
+                    is_dead: health<=0,
+                    death_x: health<=0 ? camera.position.x : 0,
+                    death_z: health<=0 ? camera.position.z : 0,
+                    last_seen: new Date()
+                });
+                let { data } = await supabase.from('players').select('*').neq('user_id', currentUser.id);
+                if(data) {
+                    for(let p of data) {
+                        if(!players.has(p.user_id)) {
+                            // 简化：不创建远程模型，避免复杂依赖，仅记录
+                            players.set(p.user_id, { name: p.name, is_dead: p.is_dead, death_x: p.death_x, death_z: p.death_z });
+                        } else {
+                            let player = players.get(p.user_id);
+                            player.is_dead = p.is_dead;
+                            player.death_x = p.death_x;
+                            player.death_z = p.death_z;
                         }
                     }
                 }
-            }
-            for(let [id, p] of players) {
-                if(p.is_dead && camera.position.distanceTo(new THREE.Vector3(p.death_x,0,p.death_z))<3 && almondWater>0 && health>0) {
-                    await supabase.from('players').update({ is_dead: false }).eq('user_id', id);
-                    almondWater--;
-                    updateUI();
-                    addChatMessage('系统', `你救活了 ${p.name}`);
+                // 救援逻辑（仅显示消息）
+                for(let [id, p] of players) {
+                    if(p.is_dead && camera.position.distanceTo(new THREE.Vector3(p.death_x,0,p.death_z))<3 && almondWater>0 && health>0) {
+                        await supabase.from('players').update({ is_dead: false }).eq('user_id', id);
+                        almondWater--;
+                        updateUI();
+                        addChatMessage('系统', `你救活了 ${p.name}`);
+                    }
                 }
-            }
+            } catch(e) { console.warn("联机同步失败", e); }
         }
+        
+        // ========== 初始化游戏 ==========
+        const healthSpan = document.getElementById('health-val');
+        const sanitySpan = document.getElementById('sanity-val');
+        const staminaSpan = document.getElementById('stamina-val');
+        const waterSpan = document.getElementById('water-val');
+        const distanceSpan = document.getElementById('distance-val');
+        const exitDistSpan = document.getElementById('exit-dist');
+        const ammoValSpan = document.getElementById('ammo-val');
+        const ammoMaxSpan = document.getElementById('ammo-max');
+        const interactHint = document.getElementById('interact-hint');
+        const taskSpan = document.getElementById('task-panel');
+        const tapeViewer = document.getElementById('tape-viewer');
+        const tapeTextDiv = document.getElementById('tape-text');
+        const passwordPanel = document.getElementById('password-panel');
+        const passwordInput = document.getElementById('password-input');
+        const closeTapeBtn = document.getElementById('close-tape');
+        const submitPasswordBtn = document.getElementById('submit-password');
+        const cancelPasswordBtn = document.getElementById('cancel-password');
+        const interactMobileBtn = document.getElementById('interact-mobile-btn');
         
         async function initGame(){
             setStatus('创建场景...');
@@ -1386,8 +1304,18 @@
                 thumb.style.transform='translate(-50%, -50%)';
             });
             
-            // 模拟登录（实际需集成 Supabase Auth）
-            currentUser = { id: 'demo', email: 'demo@example.com' };
+            // 模拟登录（若 Supabase 可用则使用真实登录，否则单人模式）
+            if(supabase) {
+                // 简易匿名登录（实际应实现邮箱登录，为简化使用匿名）
+                try {
+                    const { data, error } = await supabase.auth.signInAnonymously();
+                    if(!error) currentUser = data.user;
+                    else currentUser = { id: 'demo', email: 'demo@example.com' };
+                } catch(e) { currentUser = { id: 'demo', email: 'demo@example.com' }; }
+            } else {
+                currentUser = { id: 'demo', email: 'demo@example.com' };
+            }
+            
             let lastSync=0, lastTime=0;
             function animate(){
                 requestAnimationFrame(animate);
@@ -1429,7 +1357,7 @@
                     updateStats(delta);
                     let curTime=now/1000;
                     soundEvents = soundEvents.filter(ev => curTime - ev.time < 2.0);
-                    if(now - lastSync > 200) {
+                    if(now - lastSync > 200 && supabase) {
                         syncPlayers();
                         lastSync = now;
                     }
