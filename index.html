@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>后室·深渊 | 联机持枪正式版</title>
+    <title>后室·深渊 | 联机持枪最终版</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Courier New', monospace; background: #000; touch-action: none; }
         .svg-icon { width: 20px; height: 20px; display: inline-block; vertical-align: middle; filter: drop-shadow(0 0 2px #000); }
@@ -32,9 +32,9 @@
         #password-panel button { background: #ffaa33; border: none; padding: 8px; border-radius: 8px; cursor: pointer; }
         #tape-viewer { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.95); backdrop-filter: blur(12px); padding: 20px; border-radius: 20px; border: 1px solid #ffcc77; text-align: center; z-index: 100; display: none; flex-direction: column; gap: 10px; width: 320px; }
         #task-panel { position: absolute; top: 80px; right: 20px; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); padding: 8px 12px; border-radius: 12px; font-size: 12px; pointer-events: none; display: flex; align-items: center; gap: 6px; }
-        #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ffcc77; font-size: 24px; letter-spacing: 4px; backdrop-filter: blur(4px); }
+        #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ffcc77; font-size: 24px; letter-spacing: 4px; backdrop-filter: blur(4px); z-index: 200; }
         .damage-flash { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(180,0,0,0); pointer-events: none; z-index: 15; transition: background 0.08s; }
-        #orientation-tip { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: #ffcc77; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; font-size: 20px; text-align: center; backdrop-filter: blur(10px); display: none; }
+        #orientation-tip { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: #ffcc77; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; font-size: 20px; text-align: center; backdrop-filter: blur(10px); display: none; pointer-events: auto; cursor: pointer; }
         @media (max-width: 700px) {
             .stats-panel { font-size: 10px; top: 10px; left: 10px; gap: 8px; padding: 6px 12px; }
             .weapon-panel { font-size: 12px; bottom: 20px; left: 10px; gap: 8px; padding: 6px 12px; }
@@ -97,27 +97,30 @@
 <div class="interact-mobile-btn" id="interact-mobile-btn">🔘</div>
 <div class="damage-flash" id="damage-flash"></div>
 
-<!-- 使用国内可靠 CDN -->
+<!-- 多重 CDN 保证 Three.js 加载成功 -->
 <script src="https://cdn.bootcdn.net/ajax/libs/three.js/r128/three.min.js"></script>
+<script>if(typeof THREE==='undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');</script>
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
 <script>
     (function() {
-        // 横屏提示（不阻塞，点击可关闭）
+        // ==================== 横屏提示（不阻塞） ====================
         const orientationTip = document.getElementById('orientation-tip');
         function checkOrientation() {
-            if (window.innerHeight > window.innerWidth) {
-                orientationTip.style.display = 'flex';
-            } else {
-                orientationTip.style.display = 'none';
-            }
+            if (window.innerHeight > window.innerWidth) orientationTip.style.display = 'flex';
+            else orientationTip.style.display = 'none';
         }
         window.addEventListener('resize', checkOrientation);
-        orientationTip.addEventListener('click', () => {
-            orientationTip.style.display = 'none';
-        });
+        orientationTip.addEventListener('click', () => orientationTip.style.display = 'none');
         checkOrientation();
         
-        // WebGL 检测
+        // ==================== 强制显示 Three.js 错误提示 ====================
+        if (typeof THREE === 'undefined') {
+            alert("Three.js 库加载失败，请检查网络后刷新页面。");
+            throw new Error("THREE not loaded");
+        }
+        
+        // ==================== WebGL 检测 ====================
         let canvasTest = document.createElement('canvas');
         let gl = canvasTest.getContext('webgl') || canvasTest.getContext('experimental-webgl');
         if (!gl) {
@@ -125,20 +128,21 @@
             throw new Error('WebGL not supported');
         }
         
-        // ==================== 配置 ====================
-        // ！！！请替换为您的 Supabase 项目 URL 和 anon key ！！！
-        const SUPABASE_URL = "https://你的项目.supabase.co";
-        const SUPABASE_ANON_KEY = "你的 anon key";
+        // ==================== Supabase 配置（您提供的） ====================
+        const SUPABASE_URL = "https://mvgljtcfxmvtgbshpsgd.supabase.co";
+        const SUPABASE_ANON_KEY = "sb_publishable_t6M6Fbds5o4q3sCC0aIZZQ_LXT0BGBF";
         let supabase = null;
         try {
             supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        } catch(e) { console.warn("Supabase 初始化失败，将使用单人模式", e); }
+            console.log("Supabase 初始化成功");
+        } catch(e) { console.warn("Supabase 初始化失败，游戏将运行在单机模式", e); }
         
+        // ==================== 游戏配置 ====================
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         const PIXEL_RATIO = isMobile ? 1.0 : 1.5;
         const SHADOW_SIZE = isMobile ? 512 : 1024;
         
-        // 游戏核心变量
+        // 核心变量
         let scene, camera, renderer, clock = new THREE.Clock(), raycaster = new THREE.Raycaster();
         let keyState = { w: false, s: false, a: false, d: false, e: false };
         let cameraRotation = { yaw: 0, pitch: 0 };
@@ -174,10 +178,44 @@
         let currentUser = null;
         let players = new Map();
         
+        // UI 元素
         const statusDiv = document.getElementById('loading-status');
         function setStatus(msg) { if(statusDiv) statusDiv.innerText = msg; console.log(msg); }
         
-        // ========== 辅助函数 ==========
+        const healthSpan = document.getElementById('health-val');
+        const sanitySpan = document.getElementById('sanity-val');
+        const staminaSpan = document.getElementById('stamina-val');
+        const waterSpan = document.getElementById('water-val');
+        const distanceSpan = document.getElementById('distance-val');
+        const exitDistSpan = document.getElementById('exit-dist');
+        const ammoValSpan = document.getElementById('ammo-val');
+        const ammoMaxSpan = document.getElementById('ammo-max');
+        const interactHint = document.getElementById('interact-hint');
+        const taskSpan = document.getElementById('task-panel');
+        const tapeViewer = document.getElementById('tape-viewer');
+        const tapeTextDiv = document.getElementById('tape-text');
+        const passwordPanel = document.getElementById('password-panel');
+        const passwordInput = document.getElementById('password-input');
+        const closeTapeBtn = document.getElementById('close-tape');
+        const submitPasswordBtn = document.getElementById('submit-password');
+        const cancelPasswordBtn = document.getElementById('cancel-password');
+        const interactMobileBtn = document.getElementById('interact-mobile-btn');
+        const chatMessages = document.getElementById('chat-messages');
+        const chatInput = document.getElementById('chat-input');
+        
+        function addChatMessage(sender, msg) {
+            let div = document.createElement('div');
+            div.innerHTML = `<span style="color:#88ff88">[${sender}]</span> ${msg}`;
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        chatInput.addEventListener('keypress', (e) => {
+            if(e.key === 'Enter' && chatInput.value.trim()) {
+                addChatMessage('你', chatInput.value);
+                chatInput.value = '';
+            }
+        });
+        
         function updateUI() {
             healthSpan.innerText = Math.floor(health);
             sanitySpan.innerText = Math.floor(sanity);
@@ -207,6 +245,7 @@
             if(health<=0) { alert("你已死亡，刷新页面重来"); window.location.reload(); }
         }
         
+        // ========== 辅助函数 ==========
         function addHitEffect(pos) {
             for(let i=0;i<12;i++){
                 let particle = new THREE.Mesh(new THREE.SphereGeometry(0.04,6,6), new THREE.MeshStandardMaterial({color:0xaa2222, emissive:0x441111}));
@@ -754,7 +793,7 @@
             return best;
         }
         
-        // ========== 实体定义（完整 AI）==========
+        // 实体类（为保证篇幅，仅列出必要方法，完整 AI 已包含）
         class Smiler {
             constructor(pos){
                 this.type='smiler';
@@ -1128,13 +1167,13 @@
             return {renderTarget:rt, scene:pScene, camera:pCamera, material:pMat};
         }
         
-        // 联机功能（简化，避免因 Supabase 配置错误而卡死）
+        // 联机同步（轻量级，不阻塞）
         async function syncPlayers(){
             if(!supabase || !currentUser || !gameStarted) return;
             try {
                 await supabase.from('players').upsert({
                     user_id: currentUser.id,
-                    name: currentUser.email.split('@')[0],
+                    name: currentUser.email?.split('@')[0] || 'Player',
                     pos_x: camera.position.x,
                     pos_z: camera.position.z,
                     rot_y: cameraRotation.yaw,
@@ -1149,7 +1188,6 @@
                 if(data) {
                     for(let p of data) {
                         if(!players.has(p.user_id)) {
-                            // 简化：不创建远程模型，避免复杂依赖，仅记录
                             players.set(p.user_id, { name: p.name, is_dead: p.is_dead, death_x: p.death_x, death_z: p.death_z });
                         } else {
                             let player = players.get(p.user_id);
@@ -1159,7 +1197,6 @@
                         }
                     }
                 }
-                // 救援逻辑（仅显示消息）
                 for(let [id, p] of players) {
                     if(p.is_dead && camera.position.distanceTo(new THREE.Vector3(p.death_x,0,p.death_z))<3 && almondWater>0 && health>0) {
                         await supabase.from('players').update({ is_dead: false }).eq('user_id', id);
@@ -1171,26 +1208,7 @@
             } catch(e) { console.warn("联机同步失败", e); }
         }
         
-        // ========== 初始化游戏 ==========
-        const healthSpan = document.getElementById('health-val');
-        const sanitySpan = document.getElementById('sanity-val');
-        const staminaSpan = document.getElementById('stamina-val');
-        const waterSpan = document.getElementById('water-val');
-        const distanceSpan = document.getElementById('distance-val');
-        const exitDistSpan = document.getElementById('exit-dist');
-        const ammoValSpan = document.getElementById('ammo-val');
-        const ammoMaxSpan = document.getElementById('ammo-max');
-        const interactHint = document.getElementById('interact-hint');
-        const taskSpan = document.getElementById('task-panel');
-        const tapeViewer = document.getElementById('tape-viewer');
-        const tapeTextDiv = document.getElementById('tape-text');
-        const passwordPanel = document.getElementById('password-panel');
-        const passwordInput = document.getElementById('password-input');
-        const closeTapeBtn = document.getElementById('close-tape');
-        const submitPasswordBtn = document.getElementById('submit-password');
-        const cancelPasswordBtn = document.getElementById('cancel-password');
-        const interactMobileBtn = document.getElementById('interact-mobile-btn');
-        
+        // ========== 游戏主循环 ==========
         async function initGame(){
             setStatus('创建场景...');
             scene=new THREE.Scene();
@@ -1304,16 +1322,15 @@
                 thumb.style.transform='translate(-50%, -50%)';
             });
             
-            // 模拟登录（若 Supabase 可用则使用真实登录，否则单人模式）
+            // 初始化用户（匿名）
             if(supabase) {
-                // 简易匿名登录（实际应实现邮箱登录，为简化使用匿名）
                 try {
                     const { data, error } = await supabase.auth.signInAnonymously();
-                    if(!error) currentUser = data.user;
-                    else currentUser = { id: 'demo', email: 'demo@example.com' };
-                } catch(e) { currentUser = { id: 'demo', email: 'demo@example.com' }; }
+                    if(!error && data.user) currentUser = data.user;
+                    else currentUser = { id: 'anon_' + Math.random(), email: 'player' };
+                } catch(e) { currentUser = { id: 'anon_' + Math.random(), email: 'player' }; }
             } else {
-                currentUser = { id: 'demo', email: 'demo@example.com' };
+                currentUser = { id: 'anon_' + Math.random(), email: 'player' };
             }
             
             let lastSync=0, lastTime=0;
@@ -1371,7 +1388,11 @@
             animate();
         }
         
-        initGame();
+        // 启动游戏
+        initGame().catch(err => {
+            console.error("游戏启动失败:", err);
+            alert("游戏启动失败，请刷新页面重试。错误：" + err.message);
+        });
     })();
 </script>
 </body>
