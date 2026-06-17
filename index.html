@@ -3,18 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>后室·深渊 | 终极完整版</title>
+    <title>后室·深渊 | 终极恐怖·黑暗手电</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
         body { overflow: hidden; font-family: 'Courier New', monospace; background: #000; touch-action: none; }
-        .svg-icon { width: 20px; height: 20px; display: inline-block; vertical-align: middle; filter: drop-shadow(0 0 2px #000); }
         
         #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #ffcc77; font-size: 24px; letter-spacing: 4px; transition: opacity 0.8s; }
         #loading.hidden { opacity: 0; pointer-events: none; }
         #loading-status { margin-top: 20px; font-size: 16px; color: #aa8866; }
-        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 50; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+        #start-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); z-index: 50; display: none; align-items: center; justify-content: center; backdrop-filter: blur(6px); cursor: pointer; }
         #start-overlay.active { display: flex; }
-        #start-hint-box { background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); padding: 20px 40px; border-radius: 16px; border: 2px solid #ffcc77; color: #ffdd99; font-size: 18px; text-align: center; line-height: 1.8; animation: pulse 1.5s ease infinite; pointer-events: auto; cursor: pointer; }
+        #start-hint-box { background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); padding: 24px 48px; border-radius: 20px; border: 2px solid #ffcc77; color: #ffdd99; font-size: 20px; text-align: center; line-height: 2; animation: pulse 1.5s ease infinite; pointer-events: auto; cursor: pointer; }
         @keyframes pulse { 0%,100% { transform: scale(1); opacity: 0.9; } 50% { transform: scale(1.02); opacity: 1; } }
         
         #ui { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; color: #ffe6b3; text-shadow: 0 0 4px #000; font-weight: bold; display: none; }
@@ -41,10 +40,11 @@
         .joystick-area { position: absolute; bottom: 30px; left: 30px; width: 140px; height: 140px; pointer-events: auto; z-index: 30; }
         .joystick-base { width: 100%; height: 100%; border-radius: 50%; background: rgba(30,30,30,0.6); border: 2px solid rgba(255,200,100,0.7); position: relative; backdrop-filter: blur(4px); }
         .joystick-thumb { width: 60px; height: 60px; border-radius: 50%; background: rgba(255,200,100,0.8); position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; box-shadow: 0 0 10px rgba(255,200,100,0.5); }
-        .action-btn, .melee-btn, .interact-mobile-btn { position: absolute; pointer-events: auto; display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(8px); z-index: 30; border-radius: 50%; transition: all 0.1s; color: #fff; }
+        .action-btn, .melee-btn, .interact-mobile-btn, .flashlight-toggle-btn { position: absolute; pointer-events: auto; display: flex; align-items: center; justify-content: center; cursor: pointer; backdrop-filter: blur(8px); z-index: 30; border-radius: 50%; transition: all 0.1s; color: #fff; }
         .action-btn { bottom: 40px; right: 40px; width: 75px; height: 75px; background: rgba(180,50,50,0.85); border: 2px solid #ffaa66; box-shadow: 0 0 15px rgba(255,80,40,0.6); }
         .melee-btn { bottom: 140px; right: 40px; width: 60px; height: 60px; background: rgba(80,80,80,0.85); border: 2px solid #ccaa77; }
         .interact-mobile-btn { bottom: 230px; right: 40px; width: 60px; height: 60px; background: rgba(50,150,200,0.85); border: 2px solid #88ccff; font-size: 20px; font-weight: bold; }
+        .flashlight-toggle-btn { bottom: 320px; right: 40px; width: 60px; height: 60px; background: rgba(255,200,50,0.3); border: 2px solid #ffcc77; font-size: 18px; font-weight: bold; }
         .damage-flash { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(180,0,0,0); pointer-events: none; z-index: 15; transition: background 0.08s; }
         #orientation-tip { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: #ffcc77; display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; font-size: 20px; text-align: center; backdrop-filter: blur(10px); pointer-events: auto; cursor: pointer; }
         
@@ -53,9 +53,10 @@
             .weapon-panel { font-size: 12px; bottom: 20px; left: 10px; gap: 8px; padding: 6px 12px; }
             .ammo-panel { font-size: 16px; padding: 6px 12px; bottom: 20px; right: 20px; }
             .joystick-area { width: 110px; height: 110px; bottom: 20px; left: 20px; }
-            .action-btn, .melee-btn, .interact-mobile-btn { width: 55px; height: 55px; }
+            .action-btn, .melee-btn, .interact-mobile-btn, .flashlight-toggle-btn { width: 55px; height: 55px; }
             .melee-btn { bottom: 95px; right: 32px; }
             .interact-mobile-btn { bottom: 165px; right: 32px; }
+            .flashlight-toggle-btn { bottom: 235px; right: 32px; font-size: 14px; }
             #chat-box { width: 240px; bottom: 10px; left: 10px; }
         }
     </style>
@@ -70,16 +71,16 @@
 
 <div id="loading">
     <div style="font-size:28px; margin-bottom:12px;">后室·深渊</div>
-    <div style="font-size:14px; color:#aa8866;">终极完整版</div>
+    <div style="font-size:14px; color:#aa8866;">终极恐怖 · 黑暗手电</div>
     <div id="loading-status">加载中...</div>
 </div>
 
-<div id="start-overlay">
+<div id="start-overlay" class="active">
     <div id="start-hint-box">
-        <div style="font-size:22px;">✧ 进入后室 ✧</div>
-        <div>WASD 移动 / 鼠标转向</div>
-        <div>走近 <span style="color:#ffaa33;">黄色门</span> 按 <span style="color:#ffaa33;">E</span> 进入</div>
-        <div style="margin-top:10px; font-size:12px;">点击任意处开始体验</div>
+        <div style="font-size:24px;">✧ 进入后室 ✧</div>
+        <div>点击任意处开始</div>
+        <div style="margin-top:8px; font-size:14px; color:#aa8866;">WASD 移动 · 鼠标转向</div>
+        <div style="font-size:12px; color:#886644;">手机支持摇杆 + 触控</div>
     </div>
 </div>
 
@@ -110,16 +111,26 @@
 <div class="action-btn" id="shoot-btn"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg></div>
 <div class="melee-btn" id="melee-btn"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M16 16l4 4"/><path d="M19 21l2-2"/></svg></div>
 <div class="interact-mobile-btn" id="interact-mobile-btn">E</div>
+<div class="flashlight-toggle-btn" id="flashlight-btn">🔦</div>
 <div class="damage-flash" id="damage-flash"></div>
 
-<!-- 国内 CDN 加载 Three.js -->
+<!-- 引用 Three.js 核心库与扩展 -->
 <script src="https://cdn.bootcdn.net/ajax/libs/three.js/r128/three.min.js"></script>
 <script>if(typeof THREE==='undefined') document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>');</script>
-<script>if(typeof THREE==='undefined') document.write('<script src="https://unpkg.com/three@0.128.0/build/three.min.js"><\/script>');</script>
-<script>setTimeout(function(){if(typeof THREE==='undefined'){document.getElementById('loading-status').innerText='Three.js加载失败，请刷新页面';}},8000);</script>
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<!-- 后处理 -->
+<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
 
 <script>
 (function(){
+    // ============ 配置 ============
+    const SUPABASE_URL = "https://你的项目.supabase.co";  // 请替换
+    const SUPABASE_ANON_KEY = "你的 anon key";            // 请替换
+    const enableOnline = false; // 联机功能保留但默认关闭，提升单机体验
+
     // ============ 横屏检测 ============
     const orientationTip = document.getElementById('orientation-tip');
     function checkOrientation() { orientationTip.style.display = window.innerHeight > window.innerWidth ? 'flex' : 'none'; }
@@ -141,20 +152,20 @@
     // ============ 游戏主逻辑 ============
     function initGame() {
         try {
-            // WebGL检测
             let glTest = document.createElement('canvas').getContext('webgl');
             if(!glTest) { alert("浏览器不支持WebGL"); return; }
 
             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
             const PIXEL_RATIO = isMobile ? 1.0 : Math.min(window.devicePixelRatio, 2);
             
-            // ---------- 核心变量 ----------
-            let scene, camera, renderer, clock = new THREE.Clock(), raycaster = new THREE.Raycaster();
+            // 核心变量
+            let scene, camera, renderer, composer;
+            let clock = new THREE.Clock(), raycaster = new THREE.Raycaster();
             let keyState = { w:0, s:0, a:0, d:0, e:0 };
             let cameraRotation = { yaw: 0, pitch: 0 };
             let health=100, sanity=100, stamina=100, almondWater=0;
             let currentDistance=0, lastPosition={x:0,z:0};
-            let currentWeapon=1; // 0手枪 1冲锋枪 2MG3
+            let currentWeapon=1;
             let ammo={pistol:16, smg:50, mg3:0};
             let maxAmmo={pistol:200, smg:200, mg3:200};
             let fireRate={pistol:0.35, smg:0.12, mg3:0.08};
@@ -166,13 +177,27 @@
             let soundEvents=[];
             let cluesCollected=0, hasTape=false, tapeObject=null, tapeDigit="";
             let graffitiDigits=[], corpseDigits=[], corpses=[];
-            let smilers=[], mimics=[], dolls=[], shadows=[]; // 四种实体
+            // 实体数组
+            let smilers=[], mimics=[], dolls=[], shadows=[];
             let mouseLookActive = false;
-            let lastMouseX=0, lastMouseY=0;
+            let dustParticles = null;
+            let online = false;
+            let supabase = null;
+            let currentUser = null;
+            let players = new Map();
+
+            // ===== 新增：手电筒系统 =====
+            let flashlightOn = true;
+            let flashlightLight = null;
+            let flashlightTarget = null;
+
+            // ===== 新增：黑暗区域列表 =====
+            let darkZones = []; // 存储 { center: Vector3, radius: number }
 
             // DOM 元素
             const loadingDiv = document.getElementById('loading');
             const startOverlay = document.getElementById('start-overlay');
+            const startHintBox = document.getElementById('start-hint-box');
             const uiDiv = document.getElementById('ui');
             const interactHint = document.getElementById('interact-hint');
             const chatMessages = document.getElementById('chat-messages');
@@ -190,7 +215,9 @@
             const submitPasswordBtn = document.getElementById('submit-password');
             const tapeTextDiv = document.getElementById('tape-text');
             const tapeViewer = document.getElementById('tape-viewer');
+            const flashlightBtn = document.getElementById('flashlight-btn');
 
+            // 辅助函数
             function addChatMessage(sender, msg) {
                 let div = document.createElement('div');
                 div.innerHTML = `<span style="color:#88ff88">[${sender}]</span> ${msg}`;
@@ -224,10 +251,16 @@
                 let flash = document.getElementById('damage-flash');
                 flash.style.backgroundColor = 'rgba(180,0,0,0.7)';
                 setTimeout(() => flash.style.backgroundColor = 'rgba(180,0,0,0)', 120);
-                if(health <= 0) { alert("你已死亡，刷新页面重来"); location.reload(); }
+                if(health <= 0) {
+                    if(online && currentUser) {
+                        supabase.from('players').update({ is_dead: true, death_x: camera.position.x, death_z: camera.position.z }).eq('user_id', currentUser.id);
+                    }
+                    alert("你已死亡，刷新页面重来");
+                    location.reload();
+                }
             }
 
-            // ---------- 武器模型 ----------
+            // ==================== 武器系统 ====================
             function createPistol() { let g=new THREE.Group(); let body=new THREE.Mesh(new THREE.BoxGeometry(0.19,0.13,0.48), new THREE.MeshStandardMaterial({color:0x333333,metalness:0.9})); body.position.set(0,0,0.1); g.add(body); let grip=new THREE.Mesh(new THREE.BoxGeometry(0.14,0.22,0.3), new THREE.MeshStandardMaterial({color:0x5a3a2a})); grip.position.set(0,-0.13,-0.1); g.add(grip); return g; }
             function createSMG() { let g=new THREE.Group(); let body=new THREE.Mesh(new THREE.BoxGeometry(0.24,0.15,0.58), new THREE.MeshStandardMaterial({color:0x2a2a2a,metalness:0.85})); body.position.set(0,0,0.05); g.add(body); let mag=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.24,0.13), new THREE.MeshStandardMaterial({color:0x553322})); mag.position.set(0,-0.18,0); g.add(mag); let barrel=new THREE.Mesh(new THREE.CylinderGeometry(0.055,0.055,0.48,12), new THREE.MeshStandardMaterial({color:0x111111,metalness:0.95})); barrel.rotation.z=Math.PI/2; barrel.position.set(0,0.03,0.48); g.add(barrel); return g; }
             function createMG3() { let g=new THREE.Group(); let body=new THREE.Mesh(new THREE.BoxGeometry(0.3,0.18,0.7), new THREE.MeshStandardMaterial({color:0x2a2a2a,metalness:0.8})); body.position.set(0,0,0.05); g.add(body); let barrel=new THREE.Mesh(new THREE.CylinderGeometry(0.075,0.075,0.6,12), new THREE.MeshStandardMaterial({color:0x111111,metalness:0.95})); barrel.rotation.z=Math.PI/2; barrel.position.set(0,0.05,0.6); g.add(barrel); return g; }
@@ -246,7 +279,6 @@
             }
             window.gameSwitchWeapon = switchWeapon;
 
-            // ---------- 射击与近战 ----------
             function shoot() {
                 if(!gameStarted) return;
                 let cur = currentWeapon===0 ? ammo.pistol : (currentWeapon===1 ? ammo.smg : ammo.mg3);
@@ -259,46 +291,37 @@
                 updateUI();
                 cameraRotation.pitch += 0.045;
                 if(weaponModel) { weaponModel.position.y = -0.12; setTimeout(() => { if(weaponModel) weaponModel.position.y = 0; }, 80); }
-                // 枪口闪光
                 let flashLight = new THREE.PointLight(0xffaa66, 1.5, 6);
                 flashLight.position.set(0.5, -0.1, 0.7);
                 if(weaponModel) weaponModel.add(flashLight);
                 setTimeout(() => { if(weaponModel) weaponModel.remove(flashLight); }, 80);
-                // 声音事件
                 soundEvents.push({ pos: camera.position.clone(), radius: 40, time: now });
-                // 射线检测
                 raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-                let dmg = 1; // 对实体伤害1，需要200发击杀
-                for(let m of smilers) {
-                    let hits = raycaster.intersectObject(m.mesh, true);
-                    if(hits.length > 0) {
-                        m.health -= dmg; m.detection += 3;
-                        if(m.health <= 0) { scene.remove(m.mesh); smilers = smilers.filter(x => x !== m); }
-                        break;
-                    }
-                }
+                let dmg = 1;
+                for(let m of smilers) { if(raycaster.intersectObject(m.mesh, true).length>0) { m.health-=dmg; m.detection+=3; if(m.health<=0){scene.remove(m.mesh);smilers=smilers.filter(x=>x!==m);} break; } }
+                for(let m of mimics) { if(raycaster.intersectObject(m.mesh, true).length>0) { m.health-=dmg; if(m.health<=0){scene.remove(m.mesh);mimics=mimics.filter(x=>x!==m);} break; } }
+                for(let m of dolls) { if(raycaster.intersectObject(m.mesh, true).length>0) { m.health-=dmg; if(m.health<=0){scene.remove(m.mesh);dolls=dolls.filter(x=>x!==m);} break; } }
+                for(let m of shadows) { if(raycaster.intersectObject(m.mesh, true).length>0) { m.health-=dmg; if(m.health<=0){scene.remove(m.mesh);shadows=shadows.filter(x=>x!==m);} break; } }
             }
             function meleeAttack() {
                 if(!gameStarted) return;
                 raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-                for(let m of smilers) {
-                    let hits = raycaster.intersectObject(m.mesh, true);
-                    if(hits.length > 0 && hits[0].distance < 2) {
-                        m.health -= 30;
-                        if(m.health <= 0) { scene.remove(m.mesh); smilers = smilers.filter(x => x !== m); }
-                        break;
-                    }
-                }
+                for(let m of smilers) { let hits = raycaster.intersectObject(m.mesh, true); if(hits.length>0 && hits[0].distance<2) { m.health-=30; if(m.health<=0){scene.remove(m.mesh);smilers=smilers.filter(x=>x!==m);} break; } }
+                for(let m of mimics) { if(raycaster.intersectObject(m.mesh, true).length>0 && raycaster.intersectObject(m.mesh, true)[0].distance<2) { m.health-=30; if(m.health<=0){scene.remove(m.mesh);mimics=mimics.filter(x=>x!==m);} break; } }
+                for(let m of dolls) { if(raycaster.intersectObject(m.mesh, true).length>0 && raycaster.intersectObject(m.mesh, true)[0].distance<2) { m.health-=30; if(m.health<=0){scene.remove(m.mesh);dolls=dolls.filter(x=>x!==m);} break; } }
+                for(let m of shadows) { if(raycaster.intersectObject(m.mesh, true).length>0 && raycaster.intersectObject(m.mesh, true)[0].distance<2) { m.health-=30; if(m.health<=0){scene.remove(m.mesh);shadows=shadows.filter(x=>x!==m);} break; } }
             }
 
-            // ---------- 四种实体（笑魇完整，其他为占位可扩展） ----------
+            // ==================== 四种实体完整AI（恐怖度9/10） ====================
             class Smiler {
                 constructor(pos) {
                     this.mesh = this.createModel();
                     this.mesh.position.copy(pos);
                     scene.add(this.mesh);
-                    this.health = 200; this.speed = 6;
+                    this.health = 200; this.speed = 5.5;
                     this.attackCd = 0; this.detection = 0; this.id = Math.random();
+                    this.state = 'idle'; // idle, chase, teleport
+                    this.teleportTimer = 0;
                 }
                 createModel() {
                     const g = new THREE.Group();
@@ -307,7 +330,7 @@
                     body.position.y = 0.6; g.add(body);
                     const head = new THREE.Mesh(new THREE.SphereGeometry(0.48,32,32), mat);
                     head.position.y = 1.2; g.add(head);
-                    const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.4,0.06,16,32,Math.PI), new THREE.MeshStandardMaterial({color:0x000000,emissive:0x330000}));
+                    const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.4,0.06,16,32,Math.PI), new THREE.MeshStandardMaterial({color:0x000000, emissive:0x330000}));
                     mouth.rotation.x = 0.2; mouth.position.set(0,1.15,0.5); g.add(mouth);
                     const eyeMat = new THREE.MeshStandardMaterial({color:0xff0000, emissive:0xff2200});
                     const el = new THREE.Mesh(new THREE.SphereGeometry(0.12,16,16), eyeMat);
@@ -318,28 +341,245 @@
                 update(delta, playerPos) {
                     this.attackCd -= delta;
                     let dist = this.mesh.position.distanceTo(playerPos);
-                    if(dist < 25) {
+                    if(this.state === 'idle') {
+                        if(dist < 25) {
+                            this.state = 'chase';
+                        }
+                    } else if(this.state === 'chase') {
+                        // 追逐中随机闪现（笑魇特色）
+                        this.teleportTimer -= delta;
+                        if(this.teleportTimer <= 0 && dist > 5 && Math.random() < 0.02) {
+                            let angle = Math.random() * Math.PI * 2;
+                            let rad = 4 + Math.random() * 3;
+                            let newPos = new THREE.Vector3(playerPos.x + Math.cos(angle)*rad, 0.5, playerPos.z + Math.sin(angle)*rad);
+                            // 闪现到玩家侧后方
+                            this.mesh.position.copy(newPos);
+                            this.teleportTimer = 2 + Math.random() * 2;
+                            // 视觉闪烁
+                            this.mesh.material.emissiveIntensity = 0.8;
+                            setTimeout(() => { if(this.mesh.material) this.mesh.material.emissiveIntensity = 0.2; }, 200);
+                            // 播放短促尖叫声（用Web Audio生成）
+                            try {
+                                let actx = new (window.AudioContext || window.webkitAudioContext)();
+                                let osc = actx.createOscillator();
+                                let gain = actx.createGain();
+                                osc.connect(gain); gain.connect(actx.destination);
+                                osc.frequency.setValueAtTime(800 + Math.random()*400, actx.currentTime);
+                                osc.type = 'sawtooth';
+                                gain.gain.setValueAtTime(0.08, actx.currentTime);
+                                gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.3);
+                                osc.start(actx.currentTime); osc.stop(actx.currentTime + 0.3);
+                            } catch(e) {}
+                        }
                         let dir = new THREE.Vector3().subVectors(playerPos, this.mesh.position).normalize();
                         this.mesh.position.x += dir.x * this.speed * delta;
                         this.mesh.position.z += dir.z * this.speed * delta;
                         this.mesh.lookAt(playerPos);
-                        if(dist < 1.5 && this.attackCd <= 0) { takeDamage(22); this.attackCd = 1.2; }
+                        if(dist < 1.5 && this.attackCd <= 0) { takeDamage(25); this.attackCd = 1.2; }
                     }
                     this.mesh.position.y = 0.65 + Math.sin(performance.now()*0.005)*0.05;
                 }
             }
-            // 其他实体占位（可扩展真实AI）
-            class Mimic { constructor(pos){ this.mesh=new THREE.Group(); this.update=()=>{} } }
-            class Doll { constructor(pos){ this.mesh=new THREE.Group(); this.update=()=>{} } }
-            class Shadow { constructor(pos){ this.mesh=new THREE.Group(); this.update=()=>{} } }
 
-            // ---------- 世界生成 ----------
+            class Mimic {
+                constructor(pos) {
+                    this.mesh = this.createModel();
+                    this.mesh.position.copy(pos);
+                    scene.add(this.mesh);
+                    this.health = 200; this.speed = 5;
+                    this.attackCd = 0; this.id = Math.random();
+                    this.state = 'idle'; // idle, chase, crawl
+                    this.crawlTimer = 0;
+                    this.twitchTimer = 0;
+                }
+                createModel() {
+                    const g = new THREE.Group();
+                    const mat = new THREE.MeshStandardMaterial({color:0xccaa88, roughness:0.4});
+                    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.4,1.4,12), mat);
+                    body.position.y = 0.7; g.add(body);
+                    const head = new THREE.Mesh(new THREE.SphereGeometry(0.4,16,16), mat);
+                    head.position.y = 1.4; g.add(head);
+                    return g;
+                }
+                update(delta, playerPos) {
+                    this.attackCd -= delta;
+                    let dist = this.mesh.position.distanceTo(playerPos);
+                    if(this.state === 'idle') {
+                        if(dist < 20) this.state = 'chase';
+                    } else if(this.state === 'chase') {
+                        // 蛇形抽搐前进
+                        let dir = new THREE.Vector3().subVectors(playerPos, this.mesh.position).normalize();
+                        let side = new THREE.Vector3(-dir.z, 0, dir.x);
+                        let wobble = Math.sin(performance.now() * 0.005 + this.id) * 0.8;
+                        this.mesh.position.x += dir.x * this.speed * delta + side.x * wobble * delta * 2;
+                        this.mesh.position.z += dir.z * this.speed * delta + side.z * wobble * delta * 2;
+                        this.mesh.lookAt(playerPos);
+                        // 随机抽搐（突然抖动）
+                        this.twitchTimer -= delta;
+                        if(this.twitchTimer <= 0) {
+                            this.mesh.position.x += (Math.random()-0.5) * 1.5;
+                            this.mesh.position.z += (Math.random()-0.5) * 1.5;
+                            this.twitchTimer = 0.5 + Math.random() * 1.5;
+                        }
+                        // 随机切换为爬行（加速）
+                        if(Math.random() < 0.005) {
+                            this.state = 'crawl';
+                            this.crawlTimer = 2 + Math.random() * 3;
+                            this.speed = 10;
+                            this.mesh.position.y = 0.3; // 趴下
+                        }
+                        if(dist < 1.5 && this.attackCd <= 0) { takeDamage(20); this.attackCd = 1.2; }
+                    } else if(this.state === 'crawl') {
+                        this.crawlTimer -= delta;
+                        let dir = new THREE.Vector3().subVectors(playerPos, this.mesh.position).normalize();
+                        this.mesh.position.x += dir.x * this.speed * delta;
+                        this.mesh.position.z += dir.z * this.speed * delta;
+                        this.mesh.lookAt(playerPos);
+                        if(this.crawlTimer <= 0) {
+                            this.state = 'chase';
+                            this.speed = 5;
+                            this.mesh.position.y = 0.7;
+                        }
+                        if(dist < 1.5 && this.attackCd <= 0) { takeDamage(20); this.attackCd = 1.2; }
+                    }
+                }
+            }
+
+            class Doll {
+                constructor(pos) {
+                    this.mesh = this.createModel();
+                    this.mesh.position.copy(pos);
+                    scene.add(this.mesh);
+                    this.health = 200; this.speed = 4;
+                    this.attackCd = 0; this.id = Math.random();
+                    this.state = 'idle'; // idle, stare, charge
+                    this.stareTimer = 0;
+                    this.chargeSpeed = 0;
+                }
+                createModel() {
+                    const g = new THREE.Group();
+                    const mat = new THREE.MeshStandardMaterial({color:0x8b5a2b, roughness:0.6});
+                    const body = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.9,0.35), mat);
+                    body.position.y = 0.45; g.add(body);
+                    const head = new THREE.Mesh(new THREE.SphereGeometry(0.38,16,16), new THREE.MeshStandardMaterial({color:0xffddbb}));
+                    head.position.y = 0.95; g.add(head);
+                    const eyeMat = new THREE.MeshStandardMaterial({color:0xff0000, emissive:0xaa0000});
+                    const el = new THREE.Mesh(new THREE.SphereGeometry(0.08,8,8), eyeMat);
+                    el.position.set(-0.12,1.02,0.32); g.add(el);
+                    const er = el.clone(); er.position.set(0.12,1.02,0.32); g.add(er);
+                    return g;
+                }
+                update(delta, playerPos) {
+                    this.attackCd -= delta;
+                    let dist = this.mesh.position.distanceTo(playerPos);
+                    if(this.state === 'idle') {
+                        if(dist < 18) {
+                            this.state = 'stare';
+                            this.stareTimer = 1.5 + Math.random() * 2;
+                        }
+                    } else if(this.state === 'stare') {
+                        this.mesh.lookAt(playerPos);
+                        // 身体轻微摇晃
+                        this.mesh.position.y = 0.45 + Math.sin(performance.now()*0.002)*0.02;
+                        this.stareTimer -= delta;
+                        if(this.stareTimer <= 0) {
+                            this.state = 'charge';
+                            this.chargeSpeed = 15;
+                            // 发出恐怖音效
+                            try {
+                                let actx = new (window.AudioContext || window.webkitAudioContext)();
+                                let osc = actx.createOscillator();
+                                let gain = actx.createGain();
+                                osc.connect(gain); gain.connect(actx.destination);
+                                osc.frequency.setValueAtTime(200, actx.currentTime);
+                                osc.type = 'square';
+                                gain.gain.setValueAtTime(0.06, actx.currentTime);
+                                gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.3);
+                                osc.start(actx.currentTime); osc.stop(actx.currentTime + 0.3);
+                            } catch(e) {}
+                        }
+                    } else if(this.state === 'charge') {
+                        let dir = new THREE.Vector3().subVectors(playerPos, this.mesh.position).normalize();
+                        this.mesh.position.x += dir.x * this.chargeSpeed * delta;
+                        this.mesh.position.z += dir.z * this.chargeSpeed * delta;
+                        this.chargeSpeed *= 0.98; // 逐渐减速
+                        this.mesh.lookAt(playerPos);
+                        if(this.chargeSpeed < 4) this.state = 'idle';
+                        if(dist < 1.5 && this.attackCd <= 0) { takeDamage(30); this.attackCd = 1.5; }
+                    }
+                }
+            }
+
+            class Shadow {
+                constructor(pos) {
+                    this.mesh = this.createModel();
+                    this.mesh.position.copy(pos);
+                    scene.add(this.mesh);
+                    this.health = 200; this.speed = 7;
+                    this.attackCd = 0; this.teleportCd = 0; this.id = Math.random();
+                    this.state = 'idle'; // idle, surround, chase
+                    this.surroundAngle = 0;
+                }
+                createModel() {
+                    const g = new THREE.Group();
+                    const mat = new THREE.MeshStandardMaterial({color:0x000000, emissive:0x111111, transparent:true, opacity:0.65});
+                    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.5,1.6,12), mat);
+                    body.position.y = 0.8; g.add(body);
+                    const head = new THREE.Mesh(new THREE.SphereGeometry(0.45,16,16), mat);
+                    head.position.y = 1.6; g.add(head);
+                    const eyeMat = new THREE.MeshStandardMaterial({color:0xff0000, emissive:0xff0000});
+                    const el = new THREE.Mesh(new THREE.SphereGeometry(0.1,8,8), eyeMat);
+                    el.position.set(-0.15,1.68,0.45); g.add(el);
+                    const er = el.clone(); er.position.set(0.15,1.68,0.45); g.add(er);
+                    return g;
+                }
+                update(delta, playerPos) {
+                    this.attackCd -= delta;
+                    this.teleportCd -= delta;
+                    let dist = this.mesh.position.distanceTo(playerPos);
+                    if(this.state === 'idle') {
+                        if(dist < 20) {
+                            this.state = 'surround';
+                            this.surroundAngle = Math.atan2(this.mesh.position.z - playerPos.z, this.mesh.position.x - playerPos.x);
+                        }
+                    } else if(this.state === 'surround') {
+                        // 绕圈
+                        this.surroundAngle += delta * 2.5;
+                        let radius = 4 + Math.sin(performance.now()*0.002)*0.5;
+                        this.mesh.position.x = playerPos.x + Math.cos(this.surroundAngle) * radius;
+                        this.mesh.position.z = playerPos.z + Math.sin(this.surroundAngle) * radius;
+                        this.mesh.lookAt(playerPos);
+                        // 随机切换为追击
+                        if(Math.random() < 0.01) {
+                            this.state = 'chase';
+                            this.teleportCd = 0;
+                        }
+                        // 也允许瞬移
+                        if(this.teleportCd <= 0 && Math.random() < 0.02) {
+                            let angle = Math.random() * Math.PI * 2;
+                            let rad = 3 + Math.random() * 2;
+                            this.mesh.position.set(playerPos.x + Math.cos(angle)*rad, 0.5, playerPos.z + Math.sin(angle)*rad);
+                            this.teleportCd = 2.0;
+                        }
+                    } else if(this.state === 'chase') {
+                        let dir = new THREE.Vector3().subVectors(playerPos, this.mesh.position).normalize();
+                        this.mesh.position.x += dir.x * this.speed * delta;
+                        this.mesh.position.z += dir.z * this.speed * delta;
+                        this.mesh.lookAt(playerPos);
+                        if(dist < 1.8 && this.attackCd <= 0) { takeDamage(25); this.attackCd = 1.5; }
+                        if(dist > 25) this.state = 'idle';
+                    }
+                    this.mesh.position.y = 0.8 + Math.sin(performance.now()*0.008)*0.1;
+                }
+            }
+
+            // ==================== 世界生成（极致画质 + 黑暗区域） ====================
             function createStartRoom() {
                 const g = new THREE.Group();
                 const size = 14;
-                const wallMat = new THREE.MeshStandardMaterial({color:0xebc87e, roughness:0.6});
-                const floorMat = new THREE.MeshStandardMaterial({color:0xc8a86a, roughness:0.8});
-                const ceilMat = new THREE.MeshStandardMaterial({color:0xf5e6b0, roughness:0.7});
+                const wallMat = new THREE.MeshStandardMaterial({color:0xebc87e, roughness:0.6, metalness:0.05});
+                const floorMat = new THREE.MeshStandardMaterial({color:0xc8a86a, roughness:0.85, metalness:0.02});
+                const ceilMat = new THREE.MeshStandardMaterial({color:0xf5e6b0, roughness:0.7, metalness:0.01});
                 const floor = new THREE.Mesh(new THREE.PlaneGeometry(size,size), floorMat);
                 floor.rotation.x = -Math.PI/2; g.add(floor);
                 const ceil = new THREE.Mesh(new THREE.PlaneGeometry(size,size), ceilMat);
@@ -350,7 +590,6 @@
                     wall.position.set(w[0], w[1], w[2]); wall.rotation.y = w[3];
                     g.add(wall);
                 }
-                // 涂鸦数字线索（3个）
                 const clueNums = ["3","7","1","8","5","2","9","4"];
                 for(let i=0;i<3;i++) {
                     let num = clueNums[Math.floor(Math.random()*clueNums.length)];
@@ -361,12 +600,11 @@
                     ctx.font = 'bold 100px monospace'; ctx.fillStyle = '#ffcc77'; ctx.textAlign='center'; ctx.textBaseline='middle';
                     ctx.fillText(num, 128, 128);
                     let tex = new THREE.CanvasTexture(canvas);
-                    let plane = new THREE.Mesh(new THREE.PlaneGeometry(1.2,1.2), new THREE.MeshBasicMaterial({map:tex}));
+                    let plane = new THREE.Mesh(new THREE.PlaneGeometry(1.2,1.2), new THREE.MeshBasicMaterial({map:tex, transparent:true}));
                     plane.position.set(-2 + i*2, 2.2, -size/2+0.15);
                     g.add(plane);
                 }
-                // 5个门（前、左、右各一，再加两个侧门）
-                const doorMat2 = new THREE.MeshStandardMaterial({color:0xaa8866});
+                const doorMat2 = new THREE.MeshStandardMaterial({color:0xaa8866, roughness:0.4});
                 const doorPositions = [
                     [0, size/2-0.1, 0],
                     [-size/2+0.1, 0, Math.PI/2],
@@ -378,14 +616,17 @@
                     let df = new THREE.Mesh(new THREE.BoxGeometry(1.6,2.6,0.15), doorMat2);
                     df.position.set(d[0], 1.3, d[1]); df.rotation.y = d[2];
                     g.add(df);
-                    let knob = new THREE.Mesh(new THREE.SphereGeometry(0.08,8,8), new THREE.MeshStandardMaterial({color:0xccaa77}));
+                    let knob = new THREE.Mesh(new THREE.SphereGeometry(0.08,8,8), new THREE.MeshStandardMaterial({color:0xccaa77, metalness:0.8}));
                     knob.position.set(d[0]+(d[2]===0?0.5:0), 1.3, d[1]+(d[2]===0?0.1:0.5));
                     g.add(knob);
                     doorMeshes.push({mesh:df});
                 }
-                // 灯光
-                let light = new THREE.PointLight(0xffdd99, 1.2, 20);
-                light.position.set(0,3,0); g.add(light);
+                let light1 = new THREE.PointLight(0xffdd99, 1.2, 20);
+                light1.position.set(0,3,0); g.add(light1);
+                let light2 = new THREE.PointLight(0xffaa66, 0.6, 15);
+                light2.position.set(-3,2.5,2); g.add(light2);
+                let light3 = new THREE.PointLight(0xffaa66, 0.6, 15);
+                light3.position.set(3,2.5,-2); g.add(light3);
                 return g;
             }
 
@@ -395,7 +636,8 @@
                 let base = type==='wall' ? '#ebc87e' : (type==='floor' ? '#c8a86a' : '#f5e6b0');
                 ctx.fillStyle = base; ctx.fillRect(0,0,512,512);
                 for(let i=0;i<3000;i++) {
-                    ctx.fillStyle = `rgba(0,0,0,${Math.random()*0.15})`;
+                    let c = Math.random()*0.15;
+                    ctx.fillStyle = `rgba(0,0,0,${c})`;
                     ctx.fillRect(Math.random()*512, Math.random()*512, 2+Math.random()*4, 2+Math.random()*4);
                 }
                 let tex = new THREE.CanvasTexture(canvas);
@@ -405,13 +647,24 @@
             }
             const CHUNK_SIZE = 80;
             let loadedChunks = new Map();
+
+            // 生成一个区块，并决定是否成为黑暗区域
             function generateChunk(cx, cz) {
                 const group = new THREE.Group();
                 const startX = cx*CHUNK_SIZE, startZ = cz*CHUNK_SIZE;
                 const cell = 8, grid = 10;
-                const wallMat = new THREE.MeshStandardMaterial({map:createPBRTexture('wall'), roughness:0.8});
-                const floorMat = new THREE.MeshStandardMaterial({map:createPBRTexture('floor'), roughness:0.9});
-                const ceilMat = new THREE.MeshStandardMaterial({map:createPBRTexture('ceil'), roughness:0.8});
+                const wallMat = new THREE.MeshStandardMaterial({map:createPBRTexture('wall'), roughness:0.8, metalness:0.05});
+                const floorMat = new THREE.MeshStandardMaterial({map:createPBRTexture('floor'), roughness:0.9, metalness:0.02});
+                const ceilMat = new THREE.MeshStandardMaterial({map:createPBRTexture('ceil'), roughness:0.8, metalness:0.01});
+
+                // 判断是否为黑暗区域（概率15%）
+                const isDark = Math.random() < 0.15;
+                if(isDark) {
+                    // 记录黑暗区域中心（区块中心）
+                    let center = new THREE.Vector3(startX + CHUNK_SIZE/2, 0, startZ + CHUNK_SIZE/2);
+                    darkZones.push({ center, radius: CHUNK_SIZE * 0.6 });
+                }
+
                 for(let i=0;i<grid;i++) {
                     for(let j=0;j<grid;j++) {
                         const x = startX + i*cell, z = startZ + j*cell;
@@ -427,9 +680,10 @@
                         const ceil = new THREE.Mesh(new THREE.PlaneGeometry(cell,cell), ceilMat);
                         ceil.rotation.x = Math.PI/2; ceil.position.set(x+cell/2,4,z+cell/2);
                         group.add(ceil);
-                        if(!isWall && Math.random()<0.1) {
-                            let light = new THREE.PointLight(0xffdd99, 0.6, 15);
-                            light.position.set(x+cell/2, 3, z+cell/2);
+                        // 如果不是黑暗区域，添加灯光
+                        if(!isDark && !isWall && Math.random()<0.12) {
+                            let light = new THREE.PointLight(0xffdd99, 0.7, 18);
+                            light.position.set(x+cell/2, 3.2, z+cell/2);
                             group.add(light);
                         }
                     }
@@ -447,33 +701,85 @@
                     let [cx,cz] = k.split(',').map(Number);
                     if(Math.abs(cx-pcx)>3 || Math.abs(cz-pcz)>3) { scene.remove(grp); loadedChunks.delete(k); }
                 }
+                // 更新灯光：在黑暗区域内降低环境光强度（动态调整）
+                // 因为区块灯光已经生成时决定，所以不需要额外操作
             }
 
-            // ---------- 补给站、尸体、录像带 ----------
+            // 灰尘粒子
+            function createDustParticles() {
+                const count = 300;
+                const positions = new Float32Array(count * 3);
+                for(let i=0;i<count;i++) {
+                    positions[i*3] = (Math.random()-0.5) * 80;
+                    positions[i*3+1] = Math.random() * 4;
+                    positions[i*3+2] = (Math.random()-0.5) * 80;
+                }
+                const geo = new THREE.BufferGeometry();
+                geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                const mat = new THREE.PointsMaterial({
+                    color: 0xccbb99,
+                    size: 0.05,
+                    transparent: true,
+                    opacity: 0.3,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                const points = new THREE.Points(geo, mat);
+                return points;
+            }
+
+            // ==================== 手电筒系统 ====================
+            function createFlashlight() {
+                const light = new THREE.SpotLight(0xffeedd, 1.5, 35, Math.PI/5, 0.6, 1.2);
+                light.position.set(0, 1.6, 0);
+                light.target.position.set(0, 1.6, -1);
+                camera.add(light);
+                camera.add(light.target);
+                // 添加光晕辅助（小光晕）
+                const helper = new THREE.Mesh(
+                    new THREE.CircleGeometry(0.3, 8),
+                    new THREE.MeshBasicMaterial({ color: 0xffeedd, transparent: true, opacity: 0.15, side: THREE.DoubleSide })
+                );
+                helper.position.set(0, 1.6, -1);
+                camera.add(helper);
+                return { light, target: light.target, helper };
+            }
+
+            function toggleFlashlight() {
+                flashlightOn = !flashlightOn;
+                if(flashlightLight) {
+                    flashlightLight.intensity = flashlightOn ? 1.5 : 0;
+                }
+                flashlightBtn.innerText = flashlightOn ? '🔦' : '🔦✖';
+            }
+
+            // ==================== 补给、尸体、录像带、实体刷新（每300米） ====================
             function spawnSupplyStation(pos) {
                 const g = new THREE.Group();
-                let base = new THREE.Mesh(new THREE.BoxGeometry(2,0.6,1.5), new THREE.MeshStandardMaterial({color:0x8B6914}));
+                let base = new THREE.Mesh(new THREE.BoxGeometry(2,0.6,1.5), new THREE.MeshStandardMaterial({color:0x8B6914, roughness:0.6}));
                 base.position.y = 0.3; g.add(base);
-                let glow = new THREE.PointLight(0xffaa66, 1, 12);
+                let glow = new THREE.PointLight(0xffaa66, 1.2, 15);
                 glow.position.set(0, 0.8, 0); g.add(glow);
+                let halo = new THREE.Mesh(new THREE.SphereGeometry(0.5,8,8), new THREE.MeshBasicMaterial({color:0xffaa66, transparent:true, opacity:0.2}));
+                halo.position.set(0, 0.8, 0); g.add(halo);
                 g.position.copy(pos); scene.add(g);
                 supplyRooms.push({mesh:g, pos, used:false});
             }
             function createDeadSoldier(pos) {
                 const g = new THREE.Group();
-                let body = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,1.3,8), new THREE.MeshStandardMaterial({color:0x4a5a2a}));
+                let body = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,1.3,8), new THREE.MeshStandardMaterial({color:0x4a5a2a, roughness:0.7}));
                 body.position.y = 0.65; g.add(body);
-                let head = new THREE.Mesh(new THREE.SphereGeometry(0.32,16,16), new THREE.MeshStandardMaterial({color:0xddccaa}));
+                let head = new THREE.Mesh(new THREE.SphereGeometry(0.32,16,16), new THREE.MeshStandardMaterial({color:0xddccaa, roughness:0.5}));
                 head.position.y = 1.4; g.add(head);
                 g.position.copy(pos); g.rotation.z = Math.PI/2 * 0.7;
                 scene.add(g);
                 let digit = Math.floor(Math.random()*10).toString();
                 return {mesh:g, digit, collected:false, pos};
             }
-            let lastCorpse=0, lastSupply=0;
+            let lastCorpse=0, lastSupply=0, lastEntitySpawnDist=0;
+
             function checkSpawning() {
                 let walked = currentDistance;
-                // 尸体每500米
                 let corpseStep = Math.floor(walked/500);
                 if(corpseStep > lastCorpse) {
                     lastCorpse = corpseStep;
@@ -482,7 +788,6 @@
                     corpses.push(createDeadSoldier(pos));
                     addChatMessage('系统', '发现尸体，靠近按 E 查看纸条');
                 }
-                // 补给站每1000米（1公里）
                 let supplyStep = Math.floor(walked/1000);
                 if(supplyStep > lastSupply) {
                     lastSupply = supplyStep;
@@ -490,19 +795,17 @@
                     let pos = new THREE.Vector3(camera.position.x+Math.cos(angle)*28, 0, camera.position.z+Math.sin(angle)*28);
                     spawnSupplyStation(pos);
                 }
-                // 出口门每15000米（15公里）
                 if(!exitDoor && walked > 15000) {
                     let angle = Math.random()*Math.PI*2;
                     let pos = new THREE.Vector3(Math.cos(angle)*300, 0, Math.sin(angle)*300);
                     let dg = new THREE.Group();
-                    let frame = new THREE.Mesh(new THREE.BoxGeometry(2.2,3.2,0.25), new THREE.MeshStandardMaterial({color:0x228B22}));
+                    let frame = new THREE.Mesh(new THREE.BoxGeometry(2.2,3.2,0.25), new THREE.MeshStandardMaterial({color:0x228B22, metalness:0.2}));
                     frame.position.y = 1.6; dg.add(frame);
-                    let glow = new THREE.PointLight(0x33ff99, 2, 25);
+                    let glow = new THREE.PointLight(0x33ff99, 2.5, 30);
                     glow.position.set(0, 1.6, 0.4); dg.add(glow);
                     dg.position.copy(pos); scene.add(dg);
                     exitDoor = {mesh:dg, pos};
                 }
-                // 录像带（只生成一次）
                 if(!tapeObject && !hasTape && walked > 500) {
                     let angle = Math.random()*Math.PI*2;
                     let pos = new THREE.Vector3(camera.position.x+Math.cos(angle)*20, 0.3, camera.position.z+Math.sin(angle)*20);
@@ -510,26 +813,31 @@
                     box.position.copy(pos); scene.add(box);
                     tapeObject = box;
                 }
+
+                // 每300米刷新实体
+                let entityStep = Math.floor(walked / 300);
+                if(entityStep > lastEntitySpawnDist) {
+                    lastEntitySpawnDist = entityStep;
+                    let angle = Math.random() * Math.PI * 2;
+                    let dist = 30 + Math.random() * 20;
+                    let pos = new THREE.Vector3(camera.position.x + Math.cos(angle)*dist, 0, camera.position.z + Math.sin(angle)*dist);
+                    let r = Math.random();
+                    let entity;
+                    if(r < 0.25) entity = new Smiler(pos);
+                    else if(r < 0.5) entity = new Mimic(pos);
+                    else if(r < 0.75) entity = new Doll(pos);
+                    else entity = new Shadow(pos);
+                    if(entity instanceof Smiler) smilers.push(entity);
+                    else if(entity instanceof Mimic) mimics.push(entity);
+                    else if(entity instanceof Doll) dolls.push(entity);
+                    else if(entity instanceof Shadow) shadows.push(entity);
+                    addChatMessage('系统', `你感觉到有什么东西在靠近... (300m)`);
+                }
             }
 
-            // ---------- 交互 ----------
+            // ==================== 交互 ====================
             function handleInteractions() {
-                if(!gameStarted) {
-                    for(let d of doorMeshes) {
-                        let wp = new THREE.Vector3();
-                        d.mesh.getWorldPosition(wp);
-                        if(camera.position.distanceTo(wp) < 2.5) {
-                            interactHint.style.display = 'block';
-                            interactHint.innerText = '按 E 或点击 [E] 进入后室';
-                            if(keyState.e || window.triggerInteract) {
-                                startGame();
-                                return;
-                            }
-                        } else interactHint.style.display = 'none';
-                    }
-                    return;
-                }
-                // 补给
+                if(!gameStarted) return;
                 for(let i=0;i<supplyRooms.length;i++) {
                     let s = supplyRooms[i];
                     if(s.used) continue;
@@ -549,7 +857,6 @@
                         return;
                     }
                 }
-                // 尸体
                 for(let c of corpses) {
                     if(c.collected) continue;
                     if(camera.position.distanceTo(c.pos) < 2) {
@@ -566,7 +873,6 @@
                         return;
                     }
                 }
-                // 录像带
                 if(tapeObject && !hasTape && camera.position.distanceTo(tapeObject.position) < 2) {
                     interactHint.style.display = 'block';
                     interactHint.innerText = '按 E 拾取录像带';
@@ -582,7 +888,6 @@
                     }
                     return;
                 }
-                // 出口
                 if(exitDoor && camera.position.distanceTo(exitDoor.pos) < 3) {
                     if(cluesCollected < 5) {
                         interactHint.style.display = 'block';
@@ -600,6 +905,7 @@
                 interactHint.style.display = 'none';
             }
 
+            // ==================== 启动游戏 ====================
             function startGame() {
                 gameStarted = true;
                 startOverlay.style.display = 'none';
@@ -607,44 +913,84 @@
                 scene.remove(startRoomGroup);
                 updateChunks();
                 switchWeapon(1);
-                for(let i=0;i<2;i++) {
+                // 初始实体
+                for(let i=0;i<3;i++) {
                     let angle = Math.random()*Math.PI*2;
                     let pos = new THREE.Vector3(camera.position.x+Math.cos(angle)*35, 0, camera.position.z+Math.sin(angle)*35);
-                    smilers.push(new Smiler(pos));
+                    let r = Math.random();
+                    if(r<0.25) smilers.push(new Smiler(pos));
+                    else if(r<0.5) mimics.push(new Mimic(pos));
+                    else if(r<0.75) dolls.push(new Doll(pos));
+                    else shadows.push(new Shadow(pos));
                 }
                 cluesCollected = graffitiDigits.length;
                 updateUI();
                 addChatMessage('系统', `进入后室。涂鸦数字: ${graffitiDigits.join(',')}`);
+                dustParticles = createDustParticles();
+                scene.add(dustParticles);
+                lastEntitySpawnDist = Math.floor(currentDistance / 300);
+                // 创建手电筒
+                let flashData = createFlashlight();
+                flashlightLight = flashData.light;
+                flashlightTarget = flashData.target;
+                // 默认开启
+                flashlightOn = true;
+                flashlightLight.intensity = 1.5;
+                flashlightBtn.innerText = '🔦';
             }
 
-            // ---------- 场景初始化 ----------
+            // ==================== 场景初始化 ====================
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x1a140f);
-            scene.fog = new THREE.FogExp2(0x1a140f, 0.008);
+            scene.fog = new THREE.FogExp2(0x1a140f, 0.006);
             camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 400);
-            camera.position.set(0, 1.65, 5.5); // 出生在门附近
+            camera.position.set(0, 1.65, 5.5);
             cameraRotation.yaw = Math.PI;
             lastPosition = {x:0, z:5.5};
-            renderer = new THREE.WebGLRenderer({antialias:true});
+            renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:"high-performance"});
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(PIXEL_RATIO);
             renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
             document.body.appendChild(renderer.domElement);
+
+            // ===== 后处理 (Bloom) =====
+            let composer, bloomPass, renderPass;
+            if(typeof EffectComposer !== 'undefined' && typeof RenderPass !== 'undefined' && typeof UnrealBloomPass !== 'undefined') {
+                composer = new EffectComposer(renderer);
+                renderPass = new RenderPass(scene, camera);
+                composer.addPass(renderPass);
+                bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.15, 0.4, 0.85);
+                composer.addPass(bloomPass);
+                console.log('后处理已启用 (Bloom)');
+            }
+
             // 灯光
-            let ambient = new THREE.AmbientLight(0x554433, 0.65);
+            let ambient = new THREE.AmbientLight(0x554433, 0.6);
             scene.add(ambient);
-            let dirLight = new THREE.DirectionalLight(0xffdd99, 0.9);
+            let dirLight = new THREE.DirectionalLight(0xffdd99, 1.0);
             dirLight.position.set(10,20,10);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
             scene.add(dirLight);
-            let flashLight = new THREE.SpotLight(0xffeedd, 1.5, 30, Math.PI/6, 0.5);
-            flashLight.position.set(0,1.6,0);
-            camera.add(flashLight);
-            flashLight.target = camera;
-            scene.add(camera);
+            let fillLight = new THREE.DirectionalLight(0x88aadd, 0.3);
+            fillLight.position.set(-10,0,10);
+            scene.add(fillLight);
+            // 手电筒将在启动后添加到camera
             startRoomGroup = createStartRoom();
             scene.add(startRoomGroup);
 
-            // ---------- 输入控制 ----------
+            // 点击开始
+            startHintBox.addEventListener('click', startGame);
+            startHintBox.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                startGame();
+            });
+
+            // ==================== 输入控制 ====================
             document.addEventListener('keydown', (e) => {
                 let k = e.key.toLowerCase();
                 if(k==='w') keyState.w=1;
@@ -657,6 +1003,7 @@
                 if(k==='3') switchWeapon(2);
                 if(k===' '||k==='f') shoot();
                 if(k==='v') meleeAttack();
+                if(k==='l') toggleFlashlight(); // 键盘L切换手电
             });
             document.addEventListener('keyup', (e) => {
                 let k = e.key.toLowerCase();
@@ -671,7 +1018,6 @@
                     cameraRotation.pitch = Math.max(-0.7, Math.min(0.7, cameraRotation.pitch));
                 }
             });
-            // 触摸视角
             let touchStartX=0, touchStartY=0;
             renderer.domElement.addEventListener('touchstart', (e) => {
                 if(e.touches.length===1) { touchStartX=e.touches[0].clientX; touchStartY=e.touches[0].clientY; }
@@ -687,7 +1033,6 @@
                     touchStartY = e.touches[0].clientY;
                 }
             });
-            // 摇杆
             const joyArea = document.getElementById('joystick-area');
             const thumb = document.getElementById('joystick-thumb');
             let joyCenter={x:0,y:0};
@@ -711,30 +1056,24 @@
                 joystickActive = false; joystickVec = {x:0,z:0};
                 thumb.style.transform = 'translate(-50%, -50%)';
             });
-            // 按钮
             document.getElementById('shoot-btn').addEventListener('click', shoot);
             document.getElementById('melee-btn').addEventListener('click', meleeAttack);
             document.getElementById('interact-mobile-btn').addEventListener('click', () => {
                 window.triggerInteract = true;
                 setTimeout(() => window.triggerInteract = false, 200);
             });
+            document.getElementById('flashlight-btn').addEventListener('click', toggleFlashlight);
             submitPasswordBtn.addEventListener('click', () => {
                 let input = passwordInput.value;
-                let correct = graffitiDigits.join('') + tapeDigit; // 简单组合
+                let correct = graffitiDigits.join('') + tapeDigit;
                 if(input === correct) {
                     alert('密码正确！成功逃离后室！');
                     location.reload();
                 } else alert('密码错误！');
             });
             chatInput.addEventListener('keypress', (e) => { if(e.key==='Enter' && chatInput.value.trim()) { addChatMessage('你', chatInput.value); chatInput.value=''; } });
-            // 加载完成，显示启动提示
-            setTimeout(() => {
-                loadingDiv.classList.add('hidden');
-                setTimeout(() => loadingDiv.style.display = 'none', 800);
-                startOverlay.classList.add('active');
-            }, 1000);
 
-            // ---------- 移动与体力 ----------
+            // ==================== 移动、体力、理智 ====================
             function updateMovement(delta) {
                 if(!gameStarted) return;
                 let moveX=0, moveZ=0;
@@ -756,16 +1095,18 @@
                 } else stamina = Math.min(100, stamina + delta*8);
             }
 
-            // ---------- 理智更新 ----------
             function updateSanity(delta) {
                 let closest = 999;
                 for(let e of smilers) closest = Math.min(closest, camera.position.distanceTo(e.mesh.position));
+                for(let e of mimics) closest = Math.min(closest, camera.position.distanceTo(e.mesh.position));
+                for(let e of dolls) closest = Math.min(closest, camera.position.distanceTo(e.mesh.position));
+                for(let e of shadows) closest = Math.min(closest, camera.position.distanceTo(e.mesh.position));
                 if(closest < 15) sanity = Math.max(0, sanity - delta*6);
                 else if(sanity < 100) sanity = Math.min(100, sanity + delta*3);
                 updateUI();
             }
 
-            // ---------- 动画循环 ----------
+            // ==================== 动画循环 ====================
             let lastRenderTime = 0;
             function animate(now) {
                 requestAnimationFrame(animate);
@@ -775,31 +1116,55 @@
                 updateMovement(delta);
                 if(gameStarted) {
                     updateChunks();
-                    for(let s of smilers) s.update(delta, camera.position);
-                    if(Math.random()<0.005 && smilers.length<4) {
-                        let angle = Math.random()*Math.PI*2;
-                        let pos = new THREE.Vector3(camera.position.x+Math.cos(angle)*40, 0, camera.position.z+Math.sin(angle)*40);
-                        smilers.push(new Smiler(pos));
-                    }
+                    for(let e of smilers) e.update(delta, camera.position);
+                    for(let e of mimics) e.update(delta, camera.position);
+                    for(let e of dolls) e.update(delta, camera.position);
+                    for(let e of shadows) e.update(delta, camera.position);
                     checkSpawning();
                     updateSanity(delta);
                     soundEvents = soundEvents.filter(ev => (now/1000 - ev.time) < 2);
+                    if(dustParticles) {
+                        let positions = dustParticles.geometry.attributes.position.array;
+                        for(let i=0;i<positions.length;i+=3) {
+                            positions[i+1] += Math.sin(now*0.001 + i)*0.0002;
+                            positions[i] += Math.cos(now*0.001 + i*0.5)*0.0001;
+                            positions[i+2] += Math.sin(now*0.001 + i*0.3)*0.0001;
+                        }
+                        dustParticles.geometry.attributes.position.needsUpdate = true;
+                    }
+                    // 手电筒跟随相机
+                    if(flashlightLight) {
+                        flashlightLight.position.copy(camera.position);
+                        flashlightLight.position.y += 0.1;
+                        // 目标在相机前方
+                        let targetPos = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion).add(camera.position);
+                        flashlightLight.target.position.copy(targetPos);
+                    }
                 }
                 handleInteractions();
                 camera.rotation.order = 'YXZ';
                 camera.rotation.y = cameraRotation.yaw;
                 camera.rotation.x = cameraRotation.pitch;
-                renderer.render(scene, camera);
+                if(composer && bloomPass) {
+                    composer.render();
+                } else {
+                    renderer.render(scene, camera);
+                }
             }
 
-            // ---------- 窗口调整 ----------
+            // ==================== 窗口调整 ====================
             window.addEventListener('resize', () => {
                 camera.aspect = window.innerWidth / window.innerHeight;
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
+                if(composer) composer.setSize(window.innerWidth, window.innerHeight);
             });
 
-            // 启动动画
+            setTimeout(() => {
+                loadingDiv.classList.add('hidden');
+                setTimeout(() => loadingDiv.style.display = 'none', 800);
+            }, 800);
+
             requestAnimationFrame(animate);
             
         } catch(err) {
