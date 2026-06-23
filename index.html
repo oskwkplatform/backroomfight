@@ -100,11 +100,10 @@
 <div class="flashlight-toggle-btn" id="flashlight-btn">🔦</div>
 <div class="damage-flash" id="damage-flash"></div>
 
-<!-- 多层 CDN 回退加载脚本 -->
+<!-- 多层 CDN 回退加载 -->
 <script>
 (function() {
     const statusEl = document.getElementById('loading-status');
-
     const CDN = {
         three: [
             'https://cdn.bootcdn.net/ajax/libs/three.js/r128/three.min.js',
@@ -142,9 +141,7 @@
         return new Promise((resolve, reject) => {
             let index = 0;
             function tryNext() {
-                if (index >= urls.length) {
-                    return reject(new Error(`所有 CDN 都无法加载 ${name}`));
-                }
+                if (index >= urls.length) return reject(new Error(`所有CDN都无法加载 ${name}`));
                 const url = urls[index++];
                 const script = document.createElement('script');
                 script.src = url;
@@ -184,6 +181,11 @@
         statusEl.innerText = '正在加载联机模块...';
         await loadScriptFromList('Supabase', CDN.supabase);
         statusEl.innerText = '引擎就绪，启动中...';
+        // 检查关键插件是否存在
+        if (typeof THREE === 'undefined' || typeof THREE.EffectComposer === 'undefined' || typeof THREE.ShaderPass === 'undefined') {
+            statusEl.innerText = '后处理插件未正确加载，请刷新';
+            return;
+        }
         initGame();
     }
 
@@ -218,7 +220,7 @@ THREE.TAAShader = {
 };
 </script>
 
-<!-- 主游戏逻辑（完整） -->
+<!-- 主游戏逻辑（完整且已修复TAA初始化） -->
 <script>
 function initGame() {
     try {
@@ -228,6 +230,12 @@ function initGame() {
 
         if (!document.createElement('canvas').getContext('webgl')) {
             alert("浏览器不支持 WebGL"); return;
+        }
+
+        // 二次确认依赖就绪
+        if (typeof THREE.EffectComposer === 'undefined' || typeof THREE.ShaderPass === 'undefined' || typeof THREE.TAAShader === 'undefined') {
+            alert("核心插件未加载，请刷新页面");
+            return;
         }
 
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -411,7 +419,7 @@ function initGame() {
             for(let m of shadows) { let hits = raycaster.intersectObject(m.mesh, true); if(hits.length>0 && hits[0].distance<2) { m.health-=30; if(m.health<=0){scene.remove(m.mesh);shadows=shadows.filter(x=>x!==m);} } }
         }
 
-        // 实体 AI
+        // 实体 AI（完整）
         class Smiler {
             constructor(pos) {
                 this.mesh = this.createModel(); this.mesh.position.copy(pos); scene.add(this.mesh);
@@ -568,7 +576,7 @@ function initGame() {
             }
         }
 
-        // 世界生成
+        // 世界生成（完整）
         function createStartRoom() {
             const g = new THREE.Group(); const size = 14;
             const wallMat = new THREE.MeshStandardMaterial({color:0xebc87e, roughness:0.6, metalness:0.05});
@@ -739,6 +747,7 @@ function initGame() {
         let reflectPlane = new THREE.Mesh(new THREE.PlaneGeometry(1000,1000), reflectMat);
         reflectPlane.rotation.x = -Math.PI/2; reflectPlane.position.y = -0.01; scene.add(reflectPlane);
 
+        // TAA 初始化（确认所有依赖都已存在）
         rtPrev = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat });
         taaComposer = new THREE.EffectComposer(renderer);
         let renderScene = new THREE.RenderPass(scene, camera);
