@@ -100,51 +100,101 @@
 <div class="flashlight-toggle-btn" id="flashlight-btn">🔦</div>
 <div class="damage-flash" id="damage-flash"></div>
 
-<!-- 智能 CDN 加载脚本 -->
+<!-- 多层 CDN 回退加载脚本 -->
 <script>
 (function() {
-    function loadScript(url, fallbackUrl) {
+    const statusEl = document.getElementById('loading-status');
+
+    const CDN = {
+        three: [
+            'https://cdn.bootcdn.net/ajax/libs/three.js/r128/three.min.js',
+            'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js',
+            'https://unpkg.com/three@0.128.0/build/three.min.js'
+        ],
+        EffectComposer: [
+            'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js',
+            'https://unpkg.com/three@0.128.0/examples/js/postprocessing/EffectComposer.js',
+            'https://cdn.bootcdn.net/ajax/libs/three.js/r128/examples/js/postprocessing/EffectComposer.js'
+        ],
+        RenderPass: [
+            'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js',
+            'https://unpkg.com/three@0.128.0/examples/js/postprocessing/RenderPass.js',
+            'https://cdn.bootcdn.net/ajax/libs/three.js/r128/examples/js/postprocessing/RenderPass.js'
+        ],
+        ShaderPass: [
+            'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js',
+            'https://unpkg.com/three@0.128.0/examples/js/postprocessing/ShaderPass.js',
+            'https://cdn.bootcdn.net/ajax/libs/three.js/r128/examples/js/postprocessing/ShaderPass.js'
+        ],
+        CopyShader: [
+            'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js',
+            'https://unpkg.com/three@0.128.0/examples/js/shaders/CopyShader.js',
+            'https://cdn.bootcdn.net/ajax/libs/three.js/r128/examples/js/shaders/CopyShader.js'
+        ],
+        supabase: [
+            'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js',
+            'https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js',
+            'https://cdn.bootcdn.net/ajax/libs/supabase/2.0.0/supabase.min.js'
+        ]
+    };
+
+    function loadScriptFromList(name, urls) {
         return new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = url;
-            script.onload = resolve;
-            script.onerror = () => {
-                if (fallbackUrl) {
-                    loadScript(fallbackUrl, null).then(resolve).catch(reject);
-                } else {
-                    reject(new Error(`Failed to load script: ${url}`));
+            let index = 0;
+            function tryNext() {
+                if (index >= urls.length) {
+                    return reject(new Error(`所有 CDN 都无法加载 ${name}`));
                 }
-            };
-            document.head.appendChild(script);
+                const url = urls[index++];
+                const script = document.createElement('script');
+                script.src = url;
+                const timeout = setTimeout(() => {
+                    script.onerror = null; script.onload = null;
+                    if (script.parentNode) script.parentNode.removeChild(script);
+                    console.warn(`${name} 超时: ${url}`);
+                    tryNext();
+                }, 10000);
+                script.onload = () => {
+                    clearTimeout(timeout);
+                    console.log(`${name} 加载成功: ${url}`);
+                    resolve();
+                };
+                script.onerror = () => {
+                    clearTimeout(timeout);
+                    if (script.parentNode) script.parentNode.removeChild(script);
+                    console.warn(`${name} 失败: ${url}`);
+                    tryNext();
+                };
+                document.head.appendChild(script);
+            }
+            tryNext();
         });
     }
 
-    // 加载 Three.js 主库
-    loadScript(
-        'https://cdn.bootcdn.net/ajax/libs/three.js/r128/three.min.js',
-        'https://unpkg.zhimg.com/three@0.128.0/build/three.min.js'
-    ).then(() => {
-        // 加载后处理扩展
-        return Promise.all([
-            loadScript('https://unpkg.zhimg.com/three@0.128.0/examples/js/postprocessing/EffectComposer.js'),
-            loadScript('https://unpkg.zhimg.com/three@0.128.0/examples/js/postprocessing/RenderPass.js'),
-            loadScript('https://unpkg.zhimg.com/three@0.128.0/examples/js/postprocessing/ShaderPass.js'),
-            loadScript('https://unpkg.zhimg.com/three@0.128.0/examples/js/shaders/CopyShader.js')
+    async function loadAll() {
+        statusEl.innerText = '正在加载 Three.js...';
+        await loadScriptFromList('Three.js', CDN.three);
+        statusEl.innerText = '正在加载后处理...';
+        await Promise.all([
+            loadScriptFromList('EffectComposer', CDN.EffectComposer),
+            loadScriptFromList('RenderPass', CDN.RenderPass),
+            loadScriptFromList('ShaderPass', CDN.ShaderPass),
+            loadScriptFromList('CopyShader', CDN.CopyShader)
         ]);
-    }).then(() => {
-        // 加载 Supabase
-        return loadScript('https://cdn.bootcdn.net/ajax/libs/supabase/2.0.0/supabase.min.js');
-    }).then(() => {
-        document.getElementById('loading-status').innerText = '引擎就绪，启动中...';
+        statusEl.innerText = '正在加载联机模块...';
+        await loadScriptFromList('Supabase', CDN.supabase);
+        statusEl.innerText = '引擎就绪，启动中...';
         initGame();
-    }).catch(err => {
-        document.getElementById('loading-status').innerText = '资源加载失败，请刷新重试';
+    }
+
+    loadAll().catch(err => {
+        statusEl.innerText = '资源加载失败，请刷新或检查网络';
         console.error(err);
     });
 })();
 </script>
 
-<!-- TAA 着色器定义 -->
+<!-- TAA 着色器 -->
 <script>
 THREE.TAAShader = {
     uniforms: {
@@ -168,7 +218,7 @@ THREE.TAAShader = {
 };
 </script>
 
-<!-- 主游戏逻辑（完整无删减） -->
+<!-- 主游戏逻辑（完整） -->
 <script>
 function initGame() {
     try {
@@ -176,14 +226,15 @@ function initGame() {
         const SUPABASE_ANON_KEY = "sb_publishable_t6M6Fbds5o4q3sCC0aIZZQ_LXT0BGBF";
         const enableOnline = true;
 
-        let glTest = document.createElement('canvas').getContext('webgl');
-        if(!glTest) { alert("浏览器不支持WebGL"); return; }
+        if (!document.createElement('canvas').getContext('webgl')) {
+            alert("浏览器不支持 WebGL"); return;
+        }
 
         const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
         const PIXEL_RATIO = isMobile ? 1.0 : Math.min(window.devicePixelRatio, 2);
 
         let scene, camera, renderer;
-        let clock = new THREE.Clock(), raycaster = new THREE.Raycaster();
+        let raycaster = new THREE.Raycaster();
         let keyState = { w:0, s:0, a:0, d:0, e:0 };
         let cameraRotation = { yaw: 0, pitch: 0 };
         let health=100, sanity=100, stamina=100, almondWater=0;
@@ -208,8 +259,7 @@ function initGame() {
         let currentUser = null;
         let players = new Map();
         let flashlightOn = true;
-        let flashlightLight = null;
-        let flashlightTarget = null;
+        let flashlightLight = null, flashlightTarget = null;
         let darkZones = [];
         let taaComposer, taaPass, rtPrev;
 
@@ -235,9 +285,9 @@ function initGame() {
         const tapeViewer = document.getElementById('tape-viewer');
         const flashlightBtn = document.getElementById('flashlight-btn');
 
-        function addChatMessage(sender, msg) {
+        function addChatMessage(s, m) {
             let div = document.createElement('div');
-            div.innerHTML = `<span style="color:#88ff88">[${sender}]</span> ${msg}`;
+            div.innerHTML = `<span style="color:#88ff88">[${s}]</span> ${m}`;
             chatMessages.appendChild(div);
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
@@ -276,7 +326,6 @@ function initGame() {
             }
         }
 
-        // 武器模型创建
         function createPistol() {
             let g = new THREE.Group();
             let body = new THREE.Mesh(new THREE.BoxGeometry(0.19,0.13,0.48), new THREE.MeshStandardMaterial({color:0x333333,metalness:0.9}));
@@ -285,7 +334,6 @@ function initGame() {
             grip.position.set(0,-0.13,-0.1); g.add(grip);
             return g;
         }
-
         function createSMG() {
             let g = new THREE.Group();
             let body = new THREE.Mesh(new THREE.BoxGeometry(0.24,0.15,0.58), new THREE.MeshStandardMaterial({color:0x2a2a2a,metalness:0.85}));
@@ -296,7 +344,6 @@ function initGame() {
             barrel.rotation.z=Math.PI/2; barrel.position.set(0,0.03,0.48); g.add(barrel);
             return g;
         }
-
         function createMG3() {
             let g = new THREE.Group();
             let body = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.18,0.7), new THREE.MeshStandardMaterial({color:0x2a2a2a,metalness:0.8}));
@@ -305,7 +352,6 @@ function initGame() {
             barrel.rotation.z=Math.PI/2; barrel.position.set(0,0.05,0.6); g.add(barrel);
             return g;
         }
-
         function createRemotePlayerModel() {
             let g = new THREE.Group();
             let body = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,1.3,8), new THREE.MeshStandardMaterial({color:0xff6666}));
@@ -328,9 +374,7 @@ function initGame() {
             weaponModel.rotation.x = 0.12; weaponModel.rotation.z = -0.12;
             camera.add(weaponModel);
             updateUI();
-            if(online && currentUser) {
-                supabaseClient.from('players').update({ weapon: currentWeapon }).eq('user_id', currentUser.id);
-            }
+            if(online && currentUser) supabaseClient.from('players').update({ weapon: currentWeapon }).eq('user_id', currentUser.id);
         }
 
         function shoot() {
@@ -367,7 +411,7 @@ function initGame() {
             for(let m of shadows) { let hits = raycaster.intersectObject(m.mesh, true); if(hits.length>0 && hits[0].distance<2) { m.health-=30; if(m.health<=0){scene.remove(m.mesh);shadows=shadows.filter(x=>x!==m);} } }
         }
 
-        // 实体类定义（完整）
+        // 实体 AI
         class Smiler {
             constructor(pos) {
                 this.mesh = this.createModel(); this.mesh.position.copy(pos); scene.add(this.mesh);
@@ -407,7 +451,6 @@ function initGame() {
                 this.mesh.position.y = 0.65 + Math.sin(performance.now()*0.005)*0.05;
             }
         }
-
         class Mimic {
             constructor(pos) {
                 this.mesh = this.createModel(); this.mesh.position.copy(pos); scene.add(this.mesh);
@@ -447,7 +490,6 @@ function initGame() {
                 }
             }
         }
-
         class Doll {
             constructor(pos) {
                 this.mesh = this.createModel(); this.mesh.position.copy(pos); scene.add(this.mesh);
@@ -486,7 +528,6 @@ function initGame() {
                 }
             }
         }
-
         class Shadow {
             constructor(pos) {
                 this.mesh = this.createModel(); this.mesh.position.copy(pos); scene.add(this.mesh);
@@ -527,7 +568,7 @@ function initGame() {
             }
         }
 
-        // 世界生成函数
+        // 世界生成
         function createStartRoom() {
             const g = new THREE.Group(); const size = 14;
             const wallMat = new THREE.MeshStandardMaterial({color:0xebc87e, roughness:0.6, metalness:0.05});
@@ -555,7 +596,6 @@ function initGame() {
             let l3=new THREE.PointLight(0xffaa66,0.6,15); l3.position.set(3,2.5,-2); g.add(l3);
             return g;
         }
-
         function createPBRTexture(type) {
             let c=document.createElement('canvas'); c.width=512;c.height=512;
             let ctx=c.getContext('2d'); let base=type==='wall'?'#ebc87e':(type==='floor'?'#c8a86a':'#f5e6b0');
@@ -563,7 +603,6 @@ function initGame() {
             for(let i=0;i<3000;i++) { ctx.fillStyle=`rgba(0,0,0,${Math.random()*0.15})`; ctx.fillRect(Math.random()*512,Math.random()*512,2+Math.random()*4,2+Math.random()*4); }
             let t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(4,4); return t;
         }
-
         const CHUNK_SIZE=80; let loadedChunks=new Map();
         function generateChunk(cx,cz) {
             const g=new THREE.Group(); const sx=cx*CHUNK_SIZE, sz=cz*CHUNK_SIZE, cell=8, grid=10;
@@ -581,28 +620,23 @@ function initGame() {
             }
             return g;
         }
-
         function updateChunks() {
             let pcx=Math.floor(camera.position.x/CHUNK_SIZE), pcz=Math.floor(camera.position.z/CHUNK_SIZE);
             for(let dx=-2;dx<=2;dx++) for(let dz=-2;dz<=2;dz++) { let k=(pcx+dx)+','+(pcz+dz); if(!loadedChunks.has(k)) { let ch=generateChunk(pcx+dx,pcz+dz); scene.add(ch); loadedChunks.set(k,ch); } }
             for(let [k,grp] of loadedChunks) { let [cx,cz]=k.split(',').map(Number); if(Math.abs(cx-pcx)>3||Math.abs(cz-pcz)>3) { scene.remove(grp); loadedChunks.delete(k); } }
         }
-
         function createDustParticles() {
             let count=300, pos=new Float32Array(count*3);
             for(let i=0;i<count;i++) { pos[i*3]=(Math.random()-0.5)*80; pos[i*3+1]=Math.random()*4; pos[i*3+2]=(Math.random()-0.5)*80; }
             let geo=new THREE.BufferGeometry(); geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
             return new THREE.Points(geo,new THREE.PointsMaterial({color:0xccbb99,size:0.05,transparent:true,opacity:0.3,blending:THREE.AdditiveBlending,depthWrite:false}));
         }
-
         function createFlashlight() {
             let light=new THREE.SpotLight(0xffeedd,1.5,35,Math.PI/5,0.6,1.2); light.position.set(0,1.6,0); light.target.position.set(0,1.6,-1);
             camera.add(light); camera.add(light.target);
             return {light, target:light.target};
         }
-
         function toggleFlashlight() { flashlightOn=!flashlightOn; if(flashlightLight) flashlightLight.intensity=flashlightOn?1.5:0; flashlightBtn.innerText=flashlightOn?'🔦':'🔦✖'; }
-
         function spawnSupplyStation(pos) {
             let g=new THREE.Group();
             let b=new THREE.Mesh(new THREE.BoxGeometry(2,0.6,1.5),new THREE.MeshStandardMaterial({color:0x8B6914})); b.position.y=0.3; g.add(b);
@@ -610,7 +644,6 @@ function initGame() {
             let h=new THREE.Mesh(new THREE.SphereGeometry(0.5,8,8),new THREE.MeshBasicMaterial({color:0xffaa66,transparent:true,opacity:0.2})); h.position.set(0,0.8,0); g.add(h);
             g.position.copy(pos); scene.add(g); supplyRooms.push({mesh:g,pos,used:false});
         }
-
         function createDeadSoldier(pos) {
             let g=new THREE.Group();
             let b=new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,1.3,8),new THREE.MeshStandardMaterial({color:0x4a5a2a})); b.position.y=0.65; g.add(b);
@@ -618,7 +651,6 @@ function initGame() {
             g.position.copy(pos); g.rotation.z=Math.PI/2*0.7; scene.add(g);
             return {mesh:g, digit:Math.floor(Math.random()*10).toString(), collected:false, pos};
         }
-
         let lastCorpse=0, lastSupply=0, lastEntitySpawnDist=0;
         function checkSpawning() {
             let walked=currentDistance;
@@ -628,7 +660,6 @@ function initGame() {
             if(!tapeObject && !hasTape && walked>500) { let a=Math.random()*Math.PI*2; let p=new THREE.Vector3(camera.position.x+Math.cos(a)*20,0.3,camera.position.z+Math.sin(a)*20); let box=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.25,0.7),new THREE.MeshStandardMaterial({color:0xcc3333,emissive:0x441111})); box.position.copy(p); scene.add(box); tapeObject=box; }
             let entityStep=Math.floor(walked/300); if(entityStep>lastEntitySpawnDist) { lastEntitySpawnDist=entityStep; let a=Math.random()*Math.PI*2,d=30+Math.random()*20,p=new THREE.Vector3(camera.position.x+Math.cos(a)*d,0,camera.position.z+Math.sin(a)*d); let r=Math.random(),e; if(r<0.25) e=new Smiler(p); else if(r<0.5) e=new Mimic(p); else if(r<0.75) e=new Doll(p); else e=new Shadow(p); if(e instanceof Smiler) smilers.push(e); else if(e instanceof Mimic) mimics.push(e); else if(e instanceof Doll) dolls.push(e); else shadows.push(e); addChatMessage('系统','你感觉到有什么东西在靠近... (300m)'); }
         }
-
         function handleInteractions() {
             if(!gameStarted) return;
             for(let i=0;i<supplyRooms.length;i++) { let s=supplyRooms[i]; if(s.used) continue; if(camera.position.distanceTo(s.pos)<2.5) { interactHint.style.display='block'; interactHint.innerText='按 E 补给 (弹药+生命)'; if(keyState.e || window.triggerInteract) { s.used=true; scene.remove(s.mesh); ammo.pistol=Math.min(maxAmmo.pistol,ammo.pistol+30); ammo.smg=Math.min(maxAmmo.smg,ammo.smg+30); ammo.mg3=Math.min(maxAmmo.mg3,ammo.mg3+50); health=Math.min(100,health+30); sanity=Math.min(100,sanity+20); updateUI(); addChatMessage('系统','获得补给'); supplyRooms.splice(i,1); window.triggerInteract=false; } return; } }
@@ -638,20 +669,16 @@ function initGame() {
             interactHint.style.display='none';
         }
 
-        // 联机部分
         async function initOnline() {
             if(!enableOnline || typeof supabase === 'undefined') return;
             try {
                 supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
                 const { data, error } = await supabaseClient.auth.signInAnonymously();
                 if(error) { console.warn('Supabase 匿名登录失败', error); return; }
-                currentUser = data.user;
-                online = true;
-                addChatMessage('系统', '联机已连接');
+                currentUser = data.user; online = true; addChatMessage('系统', '联机已连接');
                 setInterval(syncPlayers, 2000);
             } catch(e) { console.warn('联机初始化失败', e); }
         }
-
         async function syncPlayers() {
             if(!online || !currentUser) return;
             try {
@@ -695,13 +722,10 @@ function initGame() {
             let flashData = createFlashlight();
             flashlightLight = flashData.light;
             flashlightTarget = flashData.target;
-            flashlightOn = true;
-            flashlightLight.intensity = 1.5;
-            flashlightBtn.innerText = '🔦';
+            flashlightOn = true; flashlightLight.intensity = 1.5; flashlightBtn.innerText = '🔦';
             initOnline();
         }
 
-        // 场景初始化
         scene = new THREE.Scene(); scene.background = new THREE.Color(0x1a140f); scene.fog = new THREE.FogExp2(0x1a140f, 0.005);
         camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 400);
         camera.position.set(0, 1.65, 5.5); cameraRotation.yaw = Math.PI; lastPosition={x:0,z:5.5};
@@ -731,7 +755,6 @@ function initGame() {
         let dirLight = new THREE.DirectionalLight(0xffdd99, 1.0); dirLight.position.set(10,20,10); dirLight.castShadow = true; scene.add(dirLight);
         startRoomGroup = createStartRoom(); scene.add(startRoomGroup);
 
-        // 事件绑定
         startHintBox.addEventListener('click', startGame);
         startHintBox.addEventListener('touchstart', (e) => { e.preventDefault(); startGame(); });
         document.addEventListener('keydown', (e) => {
@@ -785,7 +808,7 @@ function initGame() {
         });
         chatInput.addEventListener('keypress', (e) => { if(e.key==='Enter' && chatInput.value.trim()) { addChatMessage('你', chatInput.value); chatInput.value=''; } });
 
-        // 实体距离清理
+        // 清理远处实体
         setInterval(() => {
             if(!gameStarted) return;
             const maxDist = 80;
@@ -813,7 +836,6 @@ function initGame() {
                 stamina = Math.max(0, stamina - delta*12);
             } else stamina = Math.min(100, stamina + delta*8);
         }
-
         function updateSanity(delta) {
             let closest=999;
             for(let e of smilers) closest=Math.min(closest, camera.position.distanceTo(e.mesh.position));
@@ -870,7 +892,6 @@ function initGame() {
     } catch(err) { console.error(err); alert("游戏启动失败: "+err.message); }
 }
 
-// 横屏检测
 const orientationTip = document.getElementById('orientation-tip');
 function checkOrientation() { orientationTip.style.display = window.innerHeight > window.innerWidth ? 'flex' : 'none'; }
 window.addEventListener('resize', checkOrientation);
