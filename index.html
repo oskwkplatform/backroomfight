@@ -63,17 +63,16 @@
     import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
     import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
-    // ================== Supabase 配置 ==================
-    const SUPABASE_URL = 'https://your-project.supabase.co';   // ← 替换为你的项目URL
-    const SUPABASE_ANON_KEY = 'your-anon-key';                 // ← 替换为你的anon key
+    // ================== Supabase 配置（请替换为你的实际信息）==================
+    const SUPABASE_URL = 'https://your-project.supabase.co';
+    const SUPABASE_ANON_KEY = 'your-anon-key';
 
-    // 动态导入 Supabase 客户端
     const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // ================== 场景初始化 ==================
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2(0x000000, 0.000008); // 微弱雾效
+    scene.fog = new THREE.FogExp2(0x87CEEB, 0.00001);
 
     const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 2, 250000);
     camera.position.set(0, 120, 200);
@@ -102,12 +101,7 @@
         tHistory: { value: null },
         uMix: { value: 0.1 }
       },
-      vertexShader: `
-        varying vec2 vUv;
-        void main() {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }`,
+      vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
       fragmentShader: `
         uniform sampler2D tDiffuse;
         uniform sampler2D tHistory;
@@ -144,12 +138,10 @@
     // ================== 坐标系统 ==================
     const METERS_PER_DEG = 111320.0;
     function latLonToWorld(lat, lon) {
-      const x = lon * METERS_PER_DEG * Math.cos(0);
-      const z = lat * METERS_PER_DEG;
-      return { x, z };
+      return { x: lon * METERS_PER_DEG * Math.cos(0), z: lat * METERS_PER_DEG };
     }
 
-    // ================== 太阳位置计算（精确） ==================
+    // ================== 太阳位置（精确算法）==================
     function getSunPosition(date) {
       const hours = date.getUTCHours() + date.getUTCMinutes() / 60 + date.getUTCSeconds() / 3600;
       const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / 86400000);
@@ -174,7 +166,7 @@
     }
 
     // ================== 共享 Uniforms ==================
-    const cloudUniforms = {
+    const sharedUniforms = {
       sunDir: { value: new THREE.Vector3(0, 1, 0) },
       sunElevation: { value: 0.5 },
       time: { value: 0 },
@@ -183,13 +175,13 @@
       cameraPos: { value: new THREE.Vector3() }
     };
 
-    // ================== 天空球（物理散射） ==================
+    // ================== 天空球（物理散射）==================
     const skyGeom = new THREE.SphereGeometry(95000, 64, 64);
     const skyMat = new THREE.ShaderMaterial({
       uniforms: {
-        sunDir: cloudUniforms.sunDir,
-        sunElevation: cloudUniforms.sunElevation,
-        time: cloudUniforms.time
+        sunDir: sharedUniforms.sunDir,
+        sunElevation: sharedUniforms.sunElevation,
+        time: sharedUniforms.time
       },
       vertexShader: `
         varying vec3 vWorldPos;
@@ -204,37 +196,25 @@
         uniform vec3 sunDir;
         uniform float sunElevation;
         uniform float time;
-
         vec3 getSkyColor(vec3 rd, vec3 sunDir, float sunAngle) {
           float y = rd.y;
-          // 瑞利散射基础
           vec3 rayleigh = vec3(0.3, 0.5, 0.9) * (1.0 + y * 0.5);
-          // 米氏散射（地平线附近暖色）
           vec3 mie = vec3(1.0, 0.8, 0.5) * exp(-abs(y) * 6.0);
-          // 混合
           vec3 sky = mix(rayleigh, mie, 0.4);
-          // 根据太阳高度角改变颜色
           float dayFactor = smoothstep(0.1, 0.4, sunAngle);
           float twilightFactor = smoothstep(-0.1, 0.1, sunAngle) * (1.0 - smoothstep(0.1, 0.4, sunAngle));
           float nightFactor = 1.0 - smoothstep(-0.1, 0.1, sunAngle);
-
           vec3 daySky = mix(vec3(0.35, 0.55, 0.95), vec3(0.8, 0.9, 1.0), y * 0.5 + 0.5);
           vec3 sunsetSky = mix(vec3(0.95, 0.5, 0.3), vec3(0.5, 0.2, 0.5), y * 0.5 + 0.5);
           vec3 nightSky = mix(vec3(0.02, 0.02, 0.1), vec3(0.01, 0.01, 0.05), y * 0.5 + 0.5);
-
           sky = daySky * dayFactor + sunsetSky * twilightFactor + nightSky * nightFactor;
-
-          // 太阳周围亮光
           float mu = dot(rd, sunDir);
           float sunGlow = exp(-(1.0 - mu) * 12.0) * 0.6 * clamp(sunAngle * 4.0, 0.0, 1.0);
           sky += vec3(1.0, 0.9, 0.7) * sunGlow * (1.0 - nightFactor);
-          // 地平线辉光
           float horizonGlow = exp(-abs(y) * 15.0) * 0.4;
           sky += vec3(1.0, 0.5, 0.2) * horizonGlow * (1.0 - nightFactor);
-
           return sky;
         }
-
         float starField(vec3 rd) {
           float star = 0.0;
           vec3 p = rd * 5000.0;
@@ -246,7 +226,6 @@
           }
           return star;
         }
-
         void main() {
           vec3 rd = normalize(vWorldPos);
           vec3 col = getSkyColor(rd, sunDir, sunElevation);
@@ -261,10 +240,10 @@
     sky.renderOrder = 0;
     scene.add(sky);
 
-    // ================== 体积云（FBM + 域扭曲） ==================
+    // ================== 体积云 ==================
     const cloudGeom = new THREE.SphereGeometry(62000, 64, 64);
     const cloudMat = new THREE.ShaderMaterial({
-      uniforms: cloudUniforms,
+      uniforms: sharedUniforms,
       vertexShader: `
         varying vec3 vWorldPos;
         void main() {
@@ -276,87 +255,63 @@
         precision highp float;
         varying vec3 vWorldPos;
         uniform vec3 sunDir;
-        uniform float time;
-        uniform float cloudAmount;
-        uniform float windSpeed;
-        uniform float sunElevation;
+        uniform float time, cloudAmount, windSpeed, sunElevation;
         uniform vec3 cameraPos;
-
-        // ------------- 噪声函数 -------------
-        float hash(vec3 p) {
-          p = fract(p * 0.3183099 + 0.1);
-          p *= 17.0;
-          return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
-        }
+        
+        float hash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
         float noise(vec3 x) {
           const vec3 step = vec3(110.0, 241.0, 171.0);
-          vec3 i = floor(x);
-          vec3 f = fract(x);
+          vec3 i = floor(x), f = fract(x);
           f = f * f * (3.0 - 2.0 * f);
           float n = i.x + i.y * step.x + i.z * step.y;
-          return mix(
-            mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x),
-                mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
-            mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
-                mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);
+          return mix(mix(mix(hash(i), hash(i+vec3(1,0,0)), f.x), mix(hash(i+vec3(0,1,0)), hash(i+vec3(1,1,0)), f.x), f.y),
+                     mix(mix(hash(i+vec3(0,0,1)), hash(i+vec3(1,0,1)), f.x), mix(hash(i+vec3(0,1,1)), hash(i+vec3(1,1,1)), f.x), f.y), f.z);
         }
         float fbm(vec3 p, int octaves, float lac, float gain) {
-          float value = 0.0;
-          float amp = 0.5;
-          float freq = 1.0;
-          for (int i = 0; i < 6; i++) {
-            if (i >= octaves) break;
-            value += amp * noise(p * freq);
-            freq *= lac;
-            amp *= gain;
-          }
-          return value;
+          float v=0.0, amp=0.5, freq=1.0;
+          for(int i=0;i<6;i++){ if(i>=octaves)break; v+=amp*noise(p*freq); freq*=lac; amp*=gain; }
+          return v;
         }
         vec3 domainWarp(vec3 p, float t, float strength) {
-          float q1 = fbm(p + vec3(0.0, t * 0.1, 0.0), 3, 2.0, 0.5);
-          float q2 = fbm(p + vec3(q1, 0.0, t * 0.05) * strength, 3, 2.0, 0.5);
-          return p + vec3(q1, q2, q1 + q2) * strength;
+          float q1 = fbm(p+vec3(0,t*0.1,0),3,2.0,0.5);
+          float q2 = fbm(p+vec3(q1,0,t*0.05)*strength,3,2.0,0.5);
+          return p+vec3(q1,q2,q1+q2)*strength;
         }
         float getCloudDensity(vec3 pos) {
-          vec3 warped = domainWarp(pos * 0.00008 + vec3(0, windSpeed * time * 0.008, 0), time, 1.6);
-          float dense = fbm(warped, 5, 2.3, 0.55);
-          float coverage = fbm(pos * 0.000004 + vec3(0, 0, time * 0.015), 2, 2.0, 0.6);
-          float base = dense - (1.0 - cloudAmount * 0.85);
-          base = clamp(base, 0.0, 1.0);
-          base *= smoothstep(0.3, 0.7, coverage);
+          vec3 warped = domainWarp(pos*0.00008+vec3(0,windSpeed*time*0.008,0), time, 1.6);
+          float dense = fbm(warped,5,2.3,0.55);
+          float coverage = fbm(pos*0.000004+vec3(0,0,time*0.015),2,2.0,0.6);
+          float base = dense - (1.0-cloudAmount*0.85);
+          base = clamp(base,0.0,1.0);
+          base *= smoothstep(0.3,0.7,coverage);
           return base;
         }
-        float phase(float mu, float g) {
-          return (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * mu, 1.5);
-        }
-
+        float phase(float mu, float g) { return (1.0-g*g)/pow(1.0+g*g-2.0*g*mu,1.5); }
+        
         void main() {
           vec3 ro = cameraPos;
           vec3 rd = normalize(vWorldPos - ro);
           float t = 100.0;
           float maxDist = 80000.0;
           vec4 col = vec4(0.0);
-
-          for (int i = 0; i < 160; i++) {
-            vec3 pos = ro + rd * t;
+          for(int i=0;i<160;i++){
+            vec3 pos = ro + rd*t;
             float den = getCloudDensity(pos);
-            if (den > 0.005) {
-              float mu = dot(rd, sunDir);
-              float ph = phase(mu, 0.2) * 0.65 + phase(mu, -0.15) * 0.35;
-              float light = max(0.1, mu * 0.6 + 0.4) * 0.9;
-              // 云颜色根据太阳高度角变化
-              vec3 cloudCol = mix(vec3(0.95, 0.55, 0.3), vec3(1.0, 1.0, 1.0), smoothstep(-0.1, 0.3, sunElevation));
-              cloudCol = mix(cloudCol, vec3(0.25, 0.4, 0.75), 1.0 - smoothstep(-0.1, 0.1, sunElevation));
-              float alpha = den * 0.04;
+            if(den>0.005){
+              float mu = dot(rd,sunDir);
+              float ph = phase(mu,0.2)*0.65 + phase(mu,-0.15)*0.35;
+              float light = max(0.1, mu*0.6+0.4)*0.9;
+              vec3 cloudCol = mix(vec3(0.95,0.55,0.3), vec3(1.0), smoothstep(-0.1,0.3,sunElevation));
+              cloudCol = mix(cloudCol, vec3(0.25,0.4,0.75), 1.0-smoothstep(-0.1,0.1,sunElevation));
+              float alpha = den*0.04;
               col.rgb += alpha * light * ph * cloudCol;
               col.a += alpha;
-              if (col.a > 0.95) break;
+              if(col.a>0.95) break;
             }
-            t += 180.0 + t * 0.006;
-            if (t > maxDist) break;
+            t += 180.0 + t*0.006;
+            if(t>maxDist) break;
           }
-
-          if (col.a < 0.02) discard;
+          if(col.a<0.02) discard;
           gl_FragColor = vec4(col.rgb, col.a);
         }`,
       side: THREE.FrontSide,
@@ -368,15 +323,16 @@
     clouds.renderOrder = 1;
     scene.add(clouds);
 
-    // ================== 地面（程序化地形 + 云影） ==================
+    // ================== 地面（程序化地形 + 云影）==================
     const groundGeom = new THREE.PlaneGeometry(300000, 300000, 400, 400);
     const groundMat = new THREE.ShaderMaterial({
       uniforms: {
-        sunDir: cloudUniforms.sunDir,
-        time: cloudUniforms.time,
-        cloudAmount: cloudUniforms.cloudAmount,
-        windSpeed: cloudUniforms.windSpeed,
-        sunElevation: cloudUniforms.sunElevation
+        sunDir: sharedUniforms.sunDir,
+        time: sharedUniforms.time,
+        cloudAmount: sharedUniforms.cloudAmount,
+        windSpeed: sharedUniforms.windSpeed,
+        sunElevation: sharedUniforms.sunElevation,
+        cameraPos: sharedUniforms.cameraPos   // 添加缺失的 cameraPos
       },
       vertexShader: `
         varying vec3 vWorldPos;
@@ -384,7 +340,7 @@
         void main() {
           vec4 wp = modelMatrix * vec4(position, 1.0);
           vWorldPos = wp.xyz;
-          vUv = wp.xz / 300000.0 + 0.5;  // 用于细节纹理
+          vUv = wp.xz / 300000.0 + 0.5;
           gl_Position = projectionMatrix * viewMatrix * wp;
         }`,
       fragmentShader: `
@@ -392,133 +348,100 @@
         varying vec3 vWorldPos;
         varying vec2 vUv;
         uniform vec3 sunDir;
-        uniform float time;
-        uniform float cloudAmount;
-        uniform float windSpeed;
-        uniform float sunElevation;
+        uniform float time, cloudAmount, windSpeed, sunElevation;
+        uniform vec3 cameraPos;
 
-        // ---------- 噪声（与体积云相同，以保证阴影一致） ----------
-        float hash(vec3 p) {
-          p = fract(p * 0.3183099 + 0.1);
-          p *= 17.0;
-          return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
-        }
+        // 噪声函数（与体积云相同）
+        float hash(vec3 p) { p = fract(p*0.3183099+0.1); p*=17.0; return fract(p.x*p.y*p.z*(p.x+p.y+p.z)); }
         float noise(vec3 x) {
-          const vec3 step = vec3(110.0, 241.0, 171.0);
-          vec3 i = floor(x);
-          vec3 f = fract(x);
-          f = f * f * (3.0 - 2.0 * f);
-          float n = i.x + i.y * step.x + i.z * step.y;
-          return mix(
-            mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x),
-                mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
-            mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
-                mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);
+          const vec3 step = vec3(110.0,241.0,171.0);
+          vec3 i=floor(x), f=fract(x);
+          f=f*f*(3.0-2.0*f);
+          float n=i.x+i.y*step.x+i.z*step.y;
+          return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x), mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
+                     mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x), mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);
         }
-        float fbm(vec3 p, int octaves, float lac, float gain) {
-          float value = 0.0, amp = 0.5, freq = 1.0;
-          for (int i = 0; i < 6; i++) {
-            if (i >= octaves) break;
-            value += amp * noise(p * freq);
-            freq *= lac;
-            amp *= gain;
-          }
-          return value;
+        float fbm(vec3 p,int octaves,float lac,float gain) {
+          float v=0.0,amp=0.5,freq=1.0;
+          for(int i=0;i<6;i++){ if(i>=octaves)break; v+=amp*noise(p*freq); freq*=lac; amp*=gain; }
+          return v;
         }
-        vec3 domainWarp(vec3 p, float t, float strength) {
-          float q1 = fbm(p + vec3(0.0, t * 0.1, 0.0), 3, 2.0, 0.5);
-          float q2 = fbm(p + vec3(q1, 0.0, t * 0.05) * strength, 3, 2.0, 0.5);
-          return p + vec3(q1, q2, q1 + q2) * strength;
+        vec3 domainWarp(vec3 p,float t,float strength){
+          float q1=fbm(p+vec3(0,t*0.1,0),3,2.0,0.5);
+          float q2=fbm(p+vec3(q1,0,t*0.05)*strength,3,2.0,0.5);
+          return p+vec3(q1,q2,q1+q2)*strength;
         }
-        float getCloudDensity(vec3 pos) {
-          vec3 warped = domainWarp(pos * 0.00008 + vec3(0, windSpeed * time * 0.008, 0), time, 1.6);
-          float dense = fbm(warped, 5, 2.3, 0.55);
-          float coverage = fbm(pos * 0.000004 + vec3(0, 0, time * 0.015), 2, 2.0, 0.6);
-          float base = dense - (1.0 - cloudAmount * 0.85);
-          base = clamp(base, 0.0, 1.0);
-          base *= smoothstep(0.3, 0.7, coverage);
+        float getCloudDensity(vec3 pos){
+          vec3 warped=domainWarp(pos*0.00008+vec3(0,windSpeed*time*0.008,0),time,1.6);
+          float dense=fbm(warped,5,2.3,0.55);
+          float coverage=fbm(pos*0.000004+vec3(0,0,time*0.015),2,2.0,0.6);
+          float base=dense-(1.0-cloudAmount*0.85);
+          base=clamp(base,0.0,1.0);
+          base*=smoothstep(0.3,0.7,coverage);
           return base;
         }
-
-        // 程序化地形纹理
-        vec3 getTerrainColor(vec3 worldPos) {
-          // 大尺度高度
-          float h = fbm(worldPos * 0.00001, 5, 2.0, 0.5);
-          // 小尺度细节
-          float detail = fbm(worldPos * 0.0005, 3, 2.5, 0.5) * 0.3;
-          float height = h + detail;
-
-          // 颜色混合：深水（低）→ 沙滩 → 草地 → 岩石 → 雪（高）
-          vec3 water = vec3(0.1, 0.3, 0.6);
-          vec3 sand = vec3(0.76, 0.7, 0.5);
-          vec3 grass = vec3(0.25, 0.45, 0.15);
-          vec3 rock = vec3(0.4, 0.35, 0.3);
-          vec3 snow = vec3(0.95, 0.95, 0.95);
-
-          float t1 = smoothstep(0.25, 0.35, height);
-          float t2 = smoothstep(0.4, 0.55, height);
-          float t3 = smoothstep(0.6, 0.7, height);
-          float t4 = smoothstep(0.75, 0.85, height);
-
-          vec3 col = mix(water, sand, t1);
-          col = mix(col, grass, t2);
-          col = mix(col, rock, t3);
-          col = mix(col, snow, t4);
-
-          // 添加一些微变化
-          float micro = fbm(worldPos * 0.02, 2, 3.0, 0.6);
-          col += micro * 0.04;
+        vec3 getTerrainColor(vec3 worldPos){
+          float h=fbm(worldPos*0.00001,5,2.0,0.5);
+          float detail=fbm(worldPos*0.0005,3,2.5,0.5)*0.3;
+          float height=h+detail;
+          vec3 water=vec3(0.1,0.3,0.6);
+          vec3 sand=vec3(0.76,0.7,0.5);
+          vec3 grass=vec3(0.25,0.45,0.15);
+          vec3 rock=vec3(0.4,0.35,0.3);
+          vec3 snow=vec3(0.95,0.95,0.95);
+          float t1=smoothstep(0.25,0.35,height);
+          float t2=smoothstep(0.4,0.55,height);
+          float t3=smoothstep(0.6,0.7,height);
+          float t4=smoothstep(0.75,0.85,height);
+          vec3 col=mix(water,sand,t1);
+          col=mix(col,grass,t2);
+          col=mix(col,rock,t3);
+          col=mix(col,snow,t4);
+          float micro=fbm(worldPos*0.02,2,3.0,0.6);
+          col+=micro*0.04;
           return col;
         }
-
-        void main() {
-          vec3 terrainColor = getTerrainColor(vWorldPos);
-          // 云阴影
-          float cloudShadow = getCloudDensity(vWorldPos + sunDir * 200.0);
-          float shadow = 1.0 - cloudShadow * 0.65;
-
-          // 太阳光照
-          float NdotL = max(0.2, dot(vec3(0,1,0), sunDir) * 0.8 + 0.2);
-          float ambient = 0.2;
-          vec3 color = terrainColor * (ambient + shadow * NdotL);
-
-          // 雾效融入
-          float dist = length(vWorldPos - cameraPos);  // 需要传入 cameraPos，这里省略以简化
-          // 省略雾计算
-          gl_FragColor = vec4(color, 1.0);
+        void main(){
+          vec3 terrainColor=getTerrainColor(vWorldPos);
+          float cloudShadow=getCloudDensity(vWorldPos+sunDir*200.0);
+          float shadow=1.0-cloudShadow*0.65;
+          float NdotL=max(0.2, dot(vec3(0,1,0),sunDir)*0.8+0.2);
+          float ambient=0.2;
+          vec3 color=terrainColor*(ambient+shadow*NdotL);
+          // 简单的距离雾
+          float dist=length(vWorldPos-cameraPos);
+          float fogFactor=1.0-exp(-dist*0.00001);
+          vec3 fogColor=vec3(0.7,0.8,0.9);
+          color=mix(color,fogColor,fogFactor);
+          gl_FragColor=vec4(color,1.0);
         }`,
       side: THREE.DoubleSide
     });
-    // 由于 ground.frag 需要 cameraPos 来计算距离雾，我们可以再传入 cameraPos uniform，但为了简洁此处省略。
-    // 如果需要完美雾效，可自行添加 uniform cameraPos 并计算。
     const ground = new THREE.Mesh(groundGeom, groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -5;
     ground.receiveShadow = true;
     scene.add(ground);
 
-    // 更新地面 uniforms（同步时间、云量等）
     function updateGroundUniforms() {
-      ground.material.uniforms.time.value = cloudUniforms.time.value;
-      ground.material.uniforms.cloudAmount.value = cloudUniforms.cloudAmount.value;
-      ground.material.uniforms.windSpeed.value = cloudUniforms.windSpeed.value;
+      ground.material.uniforms.time.value = sharedUniforms.time.value;
+      ground.material.uniforms.cloudAmount.value = sharedUniforms.cloudAmount.value;
+      ground.material.uniforms.windSpeed.value = sharedUniforms.windSpeed.value;
     }
 
     // ================== 玩家 ==================
     let localPlayer = { lat: 0, lon: 0, altitude: 5 };
     let playerModel, mixer;
-
     const loader = new GLTFLoader();
     loader.load('https://models.readyplayer.me/64b59b0e8d2d2e5c4f90f3f1.glb', (gltf) => {
       playerModel = gltf.scene;
       playerModel.position.set(0, 5, 0);
-      playerModel.scale.set(1, 1, 1);
       scene.add(playerModel);
       mixer = new THREE.AnimationMixer(playerModel);
       gltf.animations.forEach(clip => mixer.clipAction(clip).play());
     }, undefined, () => {
       const geo = new THREE.CapsuleGeometry(0.5, 1.8);
-      const mat = new THREE.MeshStandardMaterial({ color: 0x4488ff, roughness: 0.6 });
+      const mat = new THREE.MeshStandardMaterial({ color: 0x4488ff });
       playerModel = new THREE.Mesh(geo, mat);
       playerModel.position.y = 5;
       playerModel.castShadow = true;
@@ -541,12 +464,8 @@
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       supabase.from('player_positions').upsert({
-        id: user.id,
-        latitude: localPlayer.lat,
-        longitude: localPlayer.lon,
-        altitude: localPlayer.altitude,
-        rotation: 0,
-        updated_at: new Date()
+        id: user.id, latitude: localPlayer.lat, longitude: localPlayer.lon,
+        altitude: localPlayer.altitude, rotation: 0, updated_at: new Date()
       });
     }
 
@@ -564,57 +483,46 @@
       updatePlayerPosition();
     });
 
-    // ================== UI 交互 ==================
     document.getElementById('btnTeleport').addEventListener('click', () => {
       const lat = parseFloat(document.getElementById('inpLat').value);
       const lon = parseFloat(document.getElementById('inpLon').value);
       if (!isNaN(lat) && !isNaN(lon)) {
-        localPlayer.lat = lat;
-        localPlayer.lon = lon;
+        localPlayer.lat = lat; localPlayer.lon = lon;
         updatePlayerPosition();
       }
     });
     document.getElementById('cloudAmount').addEventListener('input', (e) => {
-      cloudUniforms.cloudAmount.value = parseFloat(e.target.value);
+      sharedUniforms.cloudAmount.value = parseFloat(e.target.value);
       updateGroundUniforms();
     });
     document.getElementById('windSpeed').addEventListener('input', (e) => {
-      cloudUniforms.windSpeed.value = parseFloat(e.target.value);
+      sharedUniforms.windSpeed.value = parseFloat(e.target.value);
       updateGroundUniforms();
     });
+    let serverTimeOffset = 0;
     document.getElementById('timeOffset').addEventListener('input', (e) => {
-      // 偏移时间（本地模拟，不影响服务器时间）
       serverTimeOffset = parseFloat(e.target.value);
     });
 
-    // 时间显示
     setInterval(() => {
-      const now = new Date();
-      document.getElementById('time').textContent = now.toISOString().slice(11, 19) + ' UTC';
+      document.getElementById('time').textContent = new Date().toISOString().slice(11, 19) + ' UTC';
     }, 1000);
 
     // ================== 网络同步 ==================
-    let serverTimeOffset = 0;
     supabase.rpc('get_server_time').single().then(({ data }) => {
-      if (data) {
-        const st = new Date(data).getTime();
-        serverTimeOffset = (st - Date.now()) / 3600000;
-      }
+      if (data) serverTimeOffset = (new Date(data).getTime() - Date.now()) / 3600000;
     });
     supabase.auth.signInAnonymously();
-
     const remotePlayers = new Map();
-    supabase
-      .channel('public:player_positions')
+    supabase.channel('public:player_positions')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'player_positions' }, (payload) => {
         const p = payload.new;
         if (!p || p.id === supabase.auth.user()?.id) return;
         if (!remotePlayers.has(p.id)) {
           const geo = new THREE.CapsuleGeometry(0.5, 1.8);
-          const mat = new THREE.MeshStandardMaterial({ color: Math.random() * 0xffffff, roughness: 0.6 });
+          const mat = new THREE.MeshStandardMaterial({ color: Math.random() * 0xffffff });
           const avatar = new THREE.Mesh(geo, mat);
-          avatar.castShadow = true;
-          avatar.receiveShadow = true;
+          avatar.castShadow = true; avatar.receiveShadow = true;
           scene.add(avatar);
           remotePlayers.set(p.id, avatar);
         }
@@ -627,18 +535,14 @@
     // ================== 动画循环 ==================
     function animate() {
       requestAnimationFrame(animate);
-
       const now = new Date(Date.now() + serverTimeOffset * 3600000);
       const sun = getSunPosition(now);
-      cloudUniforms.sunDir.value.copy(sun.direction);
-      cloudUniforms.sunElevation.value = sun.elevation;
-      cloudUniforms.time.value += 0.016;
-      cloudUniforms.cameraPos.value.copy(camera.position);
+      sharedUniforms.sunDir.value.copy(sun.direction);
+      sharedUniforms.sunElevation.value = sun.elevation;
+      sharedUniforms.time.value += 0.016;
+      sharedUniforms.cameraPos.value.copy(camera.position);
       updateGroundUniforms();
-
       if (mixer) mixer.update(0.016);
-
-      // 渲染当前帧到历史纹理
       renderer.setRenderTarget(historyRT);
       renderer.render(scene, camera);
       renderer.setRenderTarget(null);
@@ -646,7 +550,6 @@
       composer.render();
       swapHistory();
     }
-
     animate();
   </script>
 </body>
